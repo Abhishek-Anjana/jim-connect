@@ -1,0 +1,54 @@
+{
+  "name": "jim-connect",
+  "version": "1.0.0",
+  "private": true,
+  "main": "expo/AppEntry.js",
+  "scripts": {
+    "start": "expo start",
+    "start:web": "expo start --web --localhost --port 8081",
+    "dev": "node scripts/start-dev.mjs",
+    "health": "node scripts/health-check.mjs",
+    "db:migrate": "node db/migrate.js",
+    "db:seed": "node db/seed.js",
+    "api": "node server/server.mjs",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "typecheck": "tsc --noEmit",
+    "doctor": "expo-doctor",
+    "audit:moderate": "npm audit --audit-level=moderate",
+    "validate:content": "node scripts/validate-content.mjs",
+    "test:date": "node scripts/test-date-utils.mjs",
+    "test:content": "node scripts/test-content-utils.mjs",
+    "test:guards": "node scripts/test-content-guards.mjs",
+    "test:cache": "node scripts/test-cache-content.mjs",
+    "test:api": "node scripts/test-api.mjs",
+    "verify": "npm run typecheck && npm run validate:content && npm run test:date && npm run test:content && npm run test:guards && npm run test:cache && npm run test:api && npm run audit:moderate",
+    "export:android": "expo export --platform android --output-dir dist-android",
+    "export:ios": "expo export --platform ios --output-dir dist-ios",
+    "export:web": "expo export --platform web --output-dir dist-web"
+  },
+  "dependencies": {
+    "@expo/metro-runtime": "~6.1.2",
+    "@expo/vector-icons": "^15.0.3",
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "expo": "^54.0.26",
+    "expo-device": "~8.0.10",
+    "expo-font": "~14.0.11",
+    "expo-notifications": "~0.32.17",
+    "expo-status-bar": "^3.0.9",
+    "pg": "^8.20.0",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "react-native": "0.81.5",
+    "react-native-web": "^0.21.0"
+  },
+  "devDependencies": {
+    "@types/react": "~19.1.10",
+    "expo-doctor": "^1.18.21",
+    "typescript": "~5.9.2"
+  },
+  "overrides": {
+    "postcss": "^8.5.10"
+  }
+}

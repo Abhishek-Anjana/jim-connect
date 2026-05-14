@@ -1,0 +1,17 @@
+node_modules/
+.expo/
+.tmp-tests/
+dist/
+dist-android/
+dist-ios/
+dist-web/
+expo-server*.log
+expo-web*.log
+api-server*.log
+tunnel-*.log
+tunnel-*.err.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.DS_Store
+.env
