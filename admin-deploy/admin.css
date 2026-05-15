@@ -1,0 +1,211 @@
+:root {
+  color: #202124;
+  background: #efe7dc;
+  font-family: Inter, Arial, sans-serif;
+}
+
+body {
+  background:
+    linear-gradient(rgba(247, 243, 236, 0.88), rgba(247, 243, 236, 0.95)),
+    url("/admin/jaipuria-campus.jpg") center top / cover fixed;
+  margin: 0;
+}
+
+main {
+  margin: 0 auto;
+  max-width: 1180px;
+  padding: 24px;
+}
+
+header {
+  align-items: center;
+  display: flex;
+  gap: 24px;
+  justify-content: space-between;
+  padding-bottom: 16px;
+}
+
+.brand {
+  align-items: center;
+  display: flex;
+  flex: 1;
+  gap: 18px;
+}
+
+.brand img {
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 8px;
+  height: 58px;
+  object-fit: contain;
+  padding: 8px;
+  width: 210px;
+}
+
+.hero {
+  background:
+    linear-gradient(90deg, rgba(32, 33, 36, 0.72), rgba(32, 33, 36, 0.2)),
+    url("/admin/jaipuria-campus.jpg") center / cover;
+  border-radius: 8px;
+  color: white;
+  margin-bottom: 18px;
+  min-height: 230px;
+  overflow: hidden;
+}
+
+.hero-copy {
+  display: grid;
+  gap: 8px;
+  max-width: 560px;
+  padding: 28px;
+}
+
+.hero p,
+.hero span {
+  color: #fff4d8;
+  font-weight: 800;
+}
+
+.hero h2 {
+  font-size: clamp(30px, 5vw, 52px);
+  line-height: 1;
+  margin: 0;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+h1 {
+  font-size: 30px;
+  margin: 4px 0 0;
+}
+
+p {
+  color: #6c625a;
+  margin: 0;
+}
+
+label {
+  color: #6c625a;
+  display: grid;
+  font-size: 13px;
+  font-weight: 700;
+  gap: 6px;
+}
+
+input,
+select,
+textarea {
+  border: 1px solid #d9cbb8;
+  border-radius: 8px;
+  box-sizing: border-box;
+  color: #202124;
+  font: inherit;
+  min-height: 42px;
+  padding: 9px 11px;
+  width: 100%;
+}
+
+textarea {
+  min-height: 96px;
+  resize: vertical;
+}
+
+nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 18px 0;
+}
+
+button {
+  background: #fffaf2;
+  border: 1px solid #d9cbb8;
+  border-radius: 8px;
+  color: #0f6b57;
+  cursor: pointer;
+  font-weight: 900;
+  min-height: 42px;
+  padding: 0 14px;
+}
+
+button.active,
+button.primary {
+  background: #0f6b57;
+  border-color: #0f6b57;
+  color: white;
+}
+
+button.danger {
+  color: #9d2832;
+}
+
+#status {
+  color: #9d2832;
+  font-weight: 800;
+  min-height: 24px;
+}
+
+.error {
+  color: #9d2832;
+  font-weight: 800;
+}
+
+.grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: 380px 1fr;
+}
+
+.panel,
+.card {
+  background: white;
+  border: 1px solid #e5d8c7;
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.form-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.row {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.list {
+  display: grid;
+  gap: 10px;
+}
+
+.stats {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  margin-bottom: 16px;
+}
+
+.card h3 {
+  margin: 0 0 8px;
+}
+
+.meta {
+  color: #6c625a;
+  font-size: 13px;
+}
+
+@media (max-width: 860px) {
+  header,
+  .brand,
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .brand img {
+    width: min(100%, 260px);
+  }
+}

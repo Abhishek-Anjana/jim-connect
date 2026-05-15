@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>JIM-Connect Admin Portal</title>
+    <link rel="stylesheet" href="/admin/admin.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="brand">
+          <img src="/admin/jaipuria-logo.png" alt="Jaipuria Institute of Management logo" />
+          <div>
+            <p>Jaipuria Institute of Management, Indore</p>
+            <h1>JIM-Connect Admin Portal</h1>
+          </div>
+        </div>
+        <button id="logout" class="danger" hidden>Logout</button>
+      </header>
+
+      <section class="hero">
+        <div class="hero-copy">
+          <p>Jaipuria Institute of Management, Indore</p>
+          <h2>Campus content operations</h2>
+          <span>Publish events, preserve archives, and maintain the Hall of Fame.</span>
+        </div>
+      </section>
+
+      <section id="login" class="panel">
+        <h2>Admin Login</h2>
+        <p class="meta">Enter the admin token configured for this server.</p>
+        <form id="login-form" class="form-grid">
+          <label>
+            Admin token
+            <input id="token" autocomplete="current-password" type="password" />
+          </label>
+          <button class="primary" type="submit">Login</button>
+        </form>
+      </section>
+
+      <nav hidden>
+        <button data-tab="dashboard" class="active">Dashboard</button>
+        <button data-tab="events">Events</button>
+        <button data-tab="archive">Archive</button>
+        <button data-tab="winners">Hall of Fame</button>
+        <button data-tab="admins">Admin Users</button>
+        <button data-tab="notifications">Notifications</button>
+        <button data-tab="audit">Audit Log</button>
+      </nav>
+
+      <section id="status"></section>
+      <section id="content" hidden></section>
+    </main>
+    <script src="/admin/admin.js"></script>
+  </body>
+</html>
