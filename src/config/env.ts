@@ -1,4 +1,4 @@
-const rawApiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL?.trim() ?? "";
+const rawApiBaseUrl = (process.env.EXPO_PUBLIC_API_URL ?? process.env.EXPO_PUBLIC_API_BASE_URL ?? "").trim();
 const rawApiTimeoutMs = Number(process.env.EXPO_PUBLIC_API_TIMEOUT_MS ?? 8000);
 
 export const config = {
