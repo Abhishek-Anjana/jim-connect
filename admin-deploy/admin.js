@@ -5,6 +5,7 @@ const modules = {
   winners: ["id", "name", "batch", "award", "category", "club", "eventName", "archiveId", "portrait", "champion"]
 };
 
+const apiBaseUrl = "https://jim-connect-production.up.railway.app";
 let active = "dashboard";
 let store = null;
 const content = document.querySelector("#content");
@@ -24,7 +25,7 @@ function headers() {
 }
 
 async function request(path, options = {}) {
-  const response = await fetch(path, { ...options, headers: { ...headers(), ...(options.headers ?? {}) } });
+  const response = await fetch(`${apiBaseUrl}${path}`, { ...options, headers: { ...headers(), ...(options.headers ?? {}) } });
   const text = await response.text();
   const payload = text ? JSON.parse(text) : null;
   if (!response.ok) {
