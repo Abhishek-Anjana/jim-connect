@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const storePath = process.env.STORE_PATH ? resolve(process.env.STORE_PATH) : join(root, "server", "data", "store.json");
 const publicDir = join(root, "server", "public");
+const webDir = join(root, "dist-web");
 const port = Number(process.env.PORT ?? 3001);
 const adminToken = process.env.ADMIN_TOKEN ?? "jim-admin-dev";
 const defaultAdmin = {
@@ -20,11 +21,20 @@ const defaultAdmin = {
 
 const contentTypes = {
   ".css": "text/css; charset=utf-8",
+  ".gif": "image/gif",
   ".html": "text/html; charset=utf-8",
+  ".ico": "image/x-icon",
   ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
   ".js": "text/javascript; charset=utf-8",
   ".json": "application/json; charset=utf-8",
-  ".png": "image/png"
+  ".map": "application/json; charset=utf-8",
+  ".png": "image/png",
+  ".svg": "image/svg+xml",
+  ".ttf": "font/ttf",
+  ".wasm": "application/wasm",
+  ".woff": "font/woff",
+  ".woff2": "font/woff2"
 };
 
 function send(res, status, body, type = "application/json; charset=utf-8") {
@@ -245,6 +255,31 @@ async function serveStatic(pathname, res) {
   send(res, 200, body, type);
 }
 
+async function serveFile(filePath, res) {
+  const type = contentTypes[extname(filePath)] ?? "application/octet-stream";
+  const isText = type.startsWith("text/") || type.includes("json") || type.includes("svg");
+  send(res, 200, await readFile(filePath, isText ? "utf8" : undefined), type);
+}
+
+async function serveWebApp(pathname, res) {
+  if (!existsSync(webDir)) {
+    await serveStatic("/admin", res);
+    return;
+  }
+  const relative = pathname === "/" ? "index.html" : pathname.replace(/^\//, "");
+  const filePath = resolve(webDir, relative);
+  if (filePath.startsWith(webDir) && existsSync(filePath)) {
+    await serveFile(filePath, res);
+    return;
+  }
+  const indexPath = join(webDir, "index.html");
+  if (existsSync(indexPath)) {
+    await serveFile(indexPath, res);
+    return;
+  }
+  send(res, 404, { error: "Main app build not found" });
+}
+
 createServer(async (req, res) => {
   try {
     if (req.method === "OPTIONS") {
@@ -366,13 +401,13 @@ createServer(async (req, res) => {
       return;
     }
 
-    if (path === "/") {
-      await serveStatic("/admin", res);
+    if (path.startsWith("/admin")) {
+      await serveStatic(path, res);
       return;
     }
 
-    if (path.startsWith("/admin")) {
-      await serveStatic(path, res);
+    if (req.method === "GET" || req.method === "HEAD") {
+      await serveWebApp(path, res);
       return;
     }
 
@@ -382,5 +417,6 @@ createServer(async (req, res) => {
   }
 }).listen(port, () => {
   console.log(`JIM-Connect API listening on http://localhost:${port}`);
+  console.log(`Main App: http://localhost:${port}/`);
   console.log(`Admin Portal: http://localhost:${port}/admin`);
 });
