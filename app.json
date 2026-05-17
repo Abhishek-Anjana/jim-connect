@@ -23,13 +23,21 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#f7f3ec"
-      }
+      },
+      "versionCode": 2
     },
     "web": {
       "bundler": "metro"
     },
     "plugins": [
       "expo-font"
-    ]
+    ],
+    "extra": {
+      "EXPO_PUBLIC_API_URL": "https://jim-connect-production.up.railway.app",
+      "eas": {
+        "projectId": "9a9138a2-1cf6-4829-aedf-a3edf653d6e6"
+      }
+    },
+    "owner": "abhishek_anjana"
   }
 }
