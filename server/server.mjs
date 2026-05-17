@@ -366,6 +366,11 @@ createServer(async (req, res) => {
       return;
     }
 
+    if (path === "/") {
+      await serveStatic("/admin", res);
+      return;
+    }
+
     if (path.startsWith("/admin")) {
       await serveStatic(path, res);
       return;
