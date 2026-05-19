@@ -110,6 +110,9 @@ try {
   assert.equal(store.lastNotification.tokenCount, 1);
   assert.equal(store.notifications.length, 1);
   assert.equal(store.notifications[0].payload.data.eventId, "api-smoke-event");
+  assert.equal(store.notifications[0].payload.data.screen, "EventDetail");
+  assert.equal(store.notifications[0].payload.title, "New Event at JIM! 🎉");
+  assert.equal(store.notifications[0].payload.body, "API Smoke Event has been added. Tap to view details.");
   assert.ok(store.auditLog.some((entry) => entry.action === "notify" && entry.idRef === "api-smoke-event"));
 
   const viewerResponse = await fetch(`${baseUrl}/admin/api/store`, {

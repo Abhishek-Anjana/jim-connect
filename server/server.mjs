@@ -3,6 +3,9 @@ import { readFile, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import eventReminderJob from "./jobs/eventReminder.js";
+
+const { startEventReminderJob } = eventReminderJob;
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const storePath = process.env.STORE_PATH ? resolve(process.env.STORE_PATH) : join(root, "server", "data", "store.json");
@@ -63,7 +66,7 @@ async function readBody(req) {
 }
 
 function publicEvent(event) {
-  const { published, ...rest } = event;
+  const { published, reminderSent, ...rest } = event;
   return rest;
 }
 
@@ -187,20 +190,8 @@ function sanitizeStoreForAdmin(store, admin) {
   };
 }
 
-async function notifyEventPublished(store, event) {
-  const payload = {
-    body: `${event.name} | ${new Intl.DateTimeFormat("en-IN", {
-      day: "numeric",
-      month: "short",
-      hour: "numeric",
-      minute: "2-digit",
-      timeZone: "Asia/Kolkata"
-    }).format(new Date(event.startsAt))}`,
-    data: { eventId: event.id, type: "event-published" },
-    sound: "default",
-    title: "New campus event published"
-  };
-
+async function sendEventPushNotification(store, payload) {
+  store.pushTokens ??= [];
   const notificationRecord = {
     id: `notification-${Date.now()}-${Math.random().toString(16).slice(2)}`,
     payload,
@@ -231,6 +222,24 @@ async function notifyEventPublished(store, event) {
   store.notifications.unshift(notificationRecord);
   store.notifications = store.notifications.slice(0, 100);
   store.lastNotification = notificationRecord;
+}
+
+async function notifyEventPublished(store, event) {
+  await sendEventPushNotification(store, {
+    body: `${event.name} has been added. Tap to view details.`,
+    data: { eventId: event.id, screen: "EventDetail" },
+    sound: "default",
+    title: "New Event at JIM! 🎉"
+  });
+}
+
+async function notifyEventReminder(store, event) {
+  await sendEventPushNotification(store, {
+    body: `${event.name} starts in 1 hour. Don't miss it!`,
+    data: { eventId: event.id, screen: "EventDetail" },
+    sound: "default",
+    title: "Starting Soon! ⏰"
+  });
 }
 
 function upsert(collection, item) {
@@ -280,7 +289,7 @@ async function serveWebApp(pathname, res) {
   send(res, 404, { error: "Main app build not found" });
 }
 
-createServer(async (req, res) => {
+const server = createServer(async (req, res) => {
   try {
     if (req.method === "OPTIONS") {
       send(res, 204, "");
@@ -373,6 +382,9 @@ createServer(async (req, res) => {
           return;
         }
         const wasPublished = module === "events" && store.events.find((event) => event.id === item.id)?.published;
+        if (module === "events" && item.reminderSent === undefined) {
+          item.reminderSent = store.events.find((event) => event.id === item.id)?.reminderSent ?? false;
+        }
         const action = upsert(store[storeKey], item);
         audit(store, action, module, item.id, admin.email ?? admin.name);
         if (module === "events" && item.published && !wasPublished) {
@@ -415,8 +427,16 @@ createServer(async (req, res) => {
   } catch (error) {
     send(res, 500, { error: error instanceof Error ? error.message : "Server error" });
   }
-}).listen(port, () => {
+});
+
+server.listen(port, () => {
   console.log(`JIM-Connect API listening on http://localhost:${port}`);
   console.log(`Main App: http://localhost:${port}/`);
   console.log(`Admin Portal: http://localhost:${port}/admin`);
+});
+
+startEventReminderJob({
+  readStore,
+  sendReminderNotification: notifyEventReminder,
+  writeStore
 });

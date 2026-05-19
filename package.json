@@ -22,8 +22,9 @@
     "test:content": "node scripts/test-content-utils.mjs",
     "test:guards": "node scripts/test-content-guards.mjs",
     "test:cache": "node scripts/test-cache-content.mjs",
+    "test:reminders": "node scripts/test-event-reminder-job.mjs",
     "test:api": "node scripts/test-api.mjs",
-    "verify": "npm run typecheck && npm run validate:content && npm run test:date && npm run test:content && npm run test:guards && npm run test:cache && npm run test:api && npm run audit:moderate",
+    "verify": "npm run typecheck && npm run validate:content && npm run test:date && npm run test:content && npm run test:guards && npm run test:cache && npm run test:reminders && npm run test:api && npm run audit:moderate",
     "export:android": "expo export --platform android --output-dir dist-android",
     "export:ios": "expo export --platform ios --output-dir dist-ios",
     "export:web": "expo export --platform web --output-dir dist-web"

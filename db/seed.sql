@@ -1,5 +1,5 @@
 insert into events (
-  id, name, starts_at, ends_at, venue, club, image, description, speakers, attachments, published
+  id, name, starts_at, ends_at, venue, club, image, description, speakers, attachments, published, reminder_sent
 ) values
   (
     'e1',
@@ -12,7 +12,8 @@ insert into events (
     'A full-day conclave bringing together student leaders, faculty mentors, and industry speakers to explore responsible leadership, campus citizenship, and the opportunities available in the upcoming academic term.',
     '["Dr. Rekha Attri", "Dean''s Office", "Student Council"]'::jsonb,
     '["Program schedule", "Speaker note"]'::jsonb,
-    true
+    true,
+    false
   ),
   (
     'e2',
@@ -25,7 +26,8 @@ insert into events (
     'Student teams will solve a live brand positioning brief and present a campaign direction to a jury of faculty and alumni mentors.',
     '["Marketing Club Faculty Coordinator", "Alumni Jury Panel"]'::jsonb,
     '["Case brief", "Judging rubric"]'::jsonb,
-    true
+    true,
+    false
   ),
   (
     'e3',
@@ -38,7 +40,8 @@ insert into events (
     'An applied finance simulation where students analyze market signals, balance risk, and defend portfolio choices across timed rounds.',
     '["Finance Club Core Team"]'::jsonb,
     '["Simulation rules"]'::jsonb,
-    true
+    true,
+    false
   )
 on conflict (id) do nothing;
 
@@ -142,7 +145,7 @@ insert into notifications (
 ) values
   (
     'notification-1',
-    '{"title": "New campus event published", "body": "TEAM SPRIT | 16 May, 10:00 am", "sound": "default", "data": {"eventId": "e1", "type": "event-published"}}'::jsonb,
+    '{"title": "New Event at JIM! 🎉", "body": "TEAM SPRIT has been added. Tap to view details.", "sound": "default", "data": {"eventId": "e1", "screen": "EventDetail"}}'::jsonb,
     '2026-05-10T10:00:00+05:30',
     'recorded',
     3,
@@ -150,7 +153,7 @@ insert into notifications (
   ),
   (
     'notification-2',
-    '{"title": "New campus event published", "body": "Brand Sprint Challenge | 22 May, 2:00 pm", "sound": "default", "data": {"eventId": "e2", "type": "event-published"}}'::jsonb,
+    '{"title": "Starting Soon! ⏰", "body": "Brand Sprint Challenge starts in 1 hour. Don''t miss it!", "sound": "default", "data": {"eventId": "e2", "screen": "EventDetail"}}'::jsonb,
     '2026-05-11T10:00:00+05:30',
     'sent',
     2,
@@ -158,7 +161,7 @@ insert into notifications (
   ),
   (
     'notification-3',
-    '{"title": "New campus event published", "body": "FinQuest Simulation Day | 28 May, 11:30 am", "sound": "default", "data": {"eventId": "e3", "type": "event-published"}}'::jsonb,
+    '{"title": "Starting Soon! ⏰", "body": "FinQuest Simulation Day starts in 1 hour. Don''t miss it!", "sound": "default", "data": {"eventId": "e3", "screen": "EventDetail"}}'::jsonb,
     '2026-05-12T10:00:00+05:30',
     'failed',
     2,

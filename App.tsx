@@ -49,7 +49,6 @@ const campusImage = require("./assets/jaipuria-campus.jpg");
 
 export default function App() {
   const { archive, error, events, fame, lastUpdated, loading, refresh, refreshing } = useJimConnectContent();
-  usePushNotifications();
   const [tab, setTab] = useState<Tab>("events");
   const [club, setClub] = useState<Club>("All");
   const [archiveQuery, setArchiveQuery] = useState("");
@@ -57,6 +56,8 @@ export default function App() {
   const [winnerCategory, setWinnerCategory] = useState("All");
   const [archivePage, setArchivePage] = useState(1);
   const [detail, setDetail] = useState<Detail>(null);
+  const [pendingEventId, setPendingEventId] = useState<string | null>(null);
+  usePushNotifications(setPendingEventId);
 
   const visibleEvents = useMemo(
     () =>
@@ -95,6 +96,15 @@ export default function App() {
       }),
     [club, fame, winnerBatch, winnerCategory]
   );
+
+  useEffect(() => {
+    if (!pendingEventId) return;
+    const event = events.find((item) => item.id === pendingEventId);
+    if (!event) return;
+    setTab("events");
+    setDetail({ type: "event", item: event });
+    setPendingEventId(null);
+  }, [events, pendingEventId]);
 
   function openArchiveFromWinner(winner: Winner) {
     const linkedArchive = archive.find((entry) => entry.id === winner.archiveId);

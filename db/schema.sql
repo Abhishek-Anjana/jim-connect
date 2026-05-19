@@ -12,6 +12,7 @@ create table if not exists events (
   speakers jsonb not null default '[]'::jsonb,
   attachments jsonb not null default '[]'::jsonb,
   published boolean not null default false,
+  reminder_sent boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint events_ends_after_starts check (ends_at > starts_at),

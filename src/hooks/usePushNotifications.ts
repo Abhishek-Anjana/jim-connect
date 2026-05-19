@@ -14,7 +14,9 @@ Notifications.setNotificationHandler({
   })
 });
 
-export function usePushNotifications() {
+type EventNotificationHandler = (eventId: string) => void;
+
+export function usePushNotifications(onEventNotification?: EventNotificationHandler) {
   useEffect(() => {
     async function register() {
       if (!config.apiBaseUrl || Platform.OS === "web" || !Device.isDevice) return;
@@ -39,4 +41,16 @@ export function usePushNotifications() {
       // Push registration should never block read-only campus content.
     });
   }, []);
+
+  useEffect(() => {
+    const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
+      const data = response.notification.request.content.data;
+      if (data?.screen !== "EventDetail" || typeof data.eventId !== "string") return;
+      onEventNotification?.(data.eventId);
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [onEventNotification]);
 }
