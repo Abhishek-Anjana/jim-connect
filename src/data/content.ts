@@ -1,10 +1,4 @@
-export type Club =
-  | "All"
-  | "Student Affairs"
-  | "Marketing Club"
-  | "Finance Club"
-  | "HR Club"
-  | "Cultural Committee";
+export type Club = string;
 
 export type Event = {
   id: string;

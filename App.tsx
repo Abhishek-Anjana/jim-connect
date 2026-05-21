@@ -30,6 +30,7 @@ import { shareArchiveEntry, shareEvent } from "./src/utils/share";
 
 type Tab = "events" | "archive" | "fame";
 type Detail = { type: "event"; item: Event } | { type: "archive"; item: ArchiveEntry } | null;
+type EventFilterGroup = "All" | "Clubs" | "Committees";
 
 const palette = {
   ink: "#202124",
@@ -47,10 +48,55 @@ const palette = {
 const jaipuriaLogo = require("./assets/jaipuria-logo.png");
 const campusImage = require("./assets/jaipuria-campus.jpg");
 
+const eventClubFilters = [
+  "Marketing Club",
+  "Finance Club",
+  "Human Resource Club",
+  "Business Analytics Club",
+  "Operations Management Club",
+  "General Management Club"
+];
+
+const eventCommitteeFilters = [
+  "Admission Committee",
+  "Alumni Relations Committee",
+  "Cultural & Creativity Committee",
+  "Career Management Committee",
+  "Campus Administration Committee",
+  "Entrepreneurship Committee",
+  "Event Management Committee",
+  "International Relations Committee",
+  "Information Technology Committee",
+  "Learning Resource Committee",
+  "Media Relations Committee",
+  "Programme Management Committee",
+  "Sports Committee",
+  "Social Responsibility Committee",
+  "Student Welfare & Discipline Committee"
+];
+
+function normalizeFilterName(value: string) {
+  return value.toLowerCase().replace(/&/g, "and").replace(/[^a-z0-9]+/g, "");
+}
+
+function canonicalEventClub(value: string) {
+  const normalized = normalizeFilterName(value);
+  const aliases: Record<string, string> = {
+    culturalcommittee: "Cultural & Creativity Committee",
+    hrclub: "Human Resource Club",
+    humanresourcesclub: "Human Resource Club",
+    mediarelationclub: "Media Relations Committee",
+    mediarelationsclub: "Media Relations Committee"
+  };
+  return aliases[normalized] ?? value;
+}
+
 export default function App() {
   const { archive, error, events, fame, lastUpdated, loading, refresh, refreshing } = useJimConnectContent();
   const [tab, setTab] = useState<Tab>("events");
   const [club, setClub] = useState<Club>("All");
+  const [eventFilterGroup, setEventFilterGroup] = useState<EventFilterGroup>("All");
+  const [eventSubFilter, setEventSubFilter] = useState<string | null>(null);
   const [archiveQuery, setArchiveQuery] = useState("");
   const [winnerBatch, setWinnerBatch] = useState("All");
   const [winnerCategory, setWinnerCategory] = useState("All");
@@ -59,11 +105,17 @@ export default function App() {
   const [pendingEventId, setPendingEventId] = useState<string | null>(null);
   usePushNotifications(setPendingEventId);
 
-  const visibleEvents = useMemo(
-    () =>
-      sortUpcomingEvents(events).filter((event) => club === "All" || event.club === club),
-    [club, events]
-  );
+  const visibleEvents = useMemo(() => {
+    if (eventFilterGroup === "All") return sortUpcomingEvents(events);
+
+    const groupFilters = eventFilterGroup === "Clubs" ? eventClubFilters : eventCommitteeFilters;
+    const allowed = new Set(groupFilters.map(normalizeFilterName));
+    return sortUpcomingEvents(events).filter((event) => {
+      const eventClub = normalizeFilterName(canonicalEventClub(event.club));
+      if (eventSubFilter) return eventClub === normalizeFilterName(eventSubFilter);
+      return allowed.has(eventClub);
+    });
+  }, [eventFilterGroup, eventSubFilter, events]);
 
   const visibleArchive = useMemo(() => {
     const query = archiveQuery.trim().toLowerCase();
@@ -150,8 +202,13 @@ export default function App() {
             >
               {tab === "events" ? (
                 <EventsScreen
-                  club={club}
-                  setClub={setClub}
+                  filterGroup={eventFilterGroup}
+                  setFilterGroup={(nextGroup) => {
+                    setEventFilterGroup(nextGroup);
+                    setEventSubFilter(null);
+                  }}
+                  subFilter={eventSubFilter}
+                  setSubFilter={setEventSubFilter}
                   events={visibleEvents}
                   loading={loading}
                   openEvent={(event) => setDetail({ type: "event", item: event })}
@@ -194,14 +251,18 @@ export default function App() {
 }
 
 function EventsScreen({
-  club,
-  setClub,
+  filterGroup,
+  setFilterGroup,
+  subFilter,
+  setSubFilter,
   events,
   loading,
   openEvent
 }: {
-  club: Club;
-  setClub: (club: Club) => void;
+  filterGroup: EventFilterGroup;
+  setFilterGroup: (group: EventFilterGroup) => void;
+  subFilter: string | null;
+  setSubFilter: (filter: string) => void;
   events: Event[];
   loading: boolean;
   openEvent: (event: Event) => void;
@@ -210,7 +271,12 @@ function EventsScreen({
     <View>
       <CampusHero />
       <SectionHeading title="Upcoming Events" subtitle="Nearest campus opportunities first" />
-      <ClubFilter selected={club} setSelected={setClub} />
+      <EventTypeFilter
+        group={filterGroup}
+        setGroup={setFilterGroup}
+        subFilter={subFilter}
+        setSubFilter={setSubFilter}
+      />
       {loading ? (
         <LoadingState />
       ) : events.length === 0 ? (
@@ -218,6 +284,61 @@ function EventsScreen({
       ) : (
         events.map((event) => <EventCard key={event.id} event={event} onPress={() => openEvent(event)} />)
       )}
+    </View>
+  );
+}
+
+function EventTypeFilter({
+  group,
+  setGroup,
+  subFilter,
+  setSubFilter
+}: {
+  group: EventFilterGroup;
+  setGroup: (group: EventFilterGroup) => void;
+  subFilter: string | null;
+  setSubFilter: (filter: string) => void;
+}) {
+  const subFilters = group === "Clubs" ? eventClubFilters : group === "Committees" ? eventCommitteeFilters : [];
+  return (
+    <View style={styles.eventFilter}>
+      <Text style={styles.filterLabel}>Club / Committee</Text>
+      <View style={styles.segmentRow}>
+        {(["All", "Clubs", "Committees"] as EventFilterGroup[]).map((value) => {
+          const selected = group === value;
+          return (
+            <Pressable
+              key={value}
+              onPress={() => setGroup(value)}
+              style={[styles.segmentButton, selected && styles.segmentButtonActive]}
+              accessibilityRole="button"
+              accessibilityState={{ selected }}
+              accessibilityLabel={`Show ${value} events`}
+            >
+              <Text style={[styles.segmentText, selected && styles.segmentTextActive]}>{value}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+      {subFilters.length > 0 ? (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.subFilterRow}>
+          {subFilters.map((value) => {
+            const selected = subFilter === value;
+            return (
+              <Pressable
+                key={value}
+                onPress={() => setSubFilter(value)}
+                style={[styles.subFilterChip, selected && styles.subFilterChipActive]}
+                accessibilityRole="button"
+                accessibilityState={{ selected }}
+                accessibilityLabel={`Filter ${value}`}
+              >
+                <Text style={[styles.subFilterText, selected && styles.subFilterTextActive]}>{value}</Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      ) : null}
     </View>
   );
 }
@@ -730,6 +851,62 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     marginBottom: 8,
     marginTop: 12
+  },
+  eventFilter: {
+    marginBottom: 2
+  },
+  segmentRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 8
+  },
+  segmentButton: {
+    alignItems: "center",
+    backgroundColor: palette.card,
+    borderColor: palette.green,
+    borderRadius: 8,
+    borderWidth: 1,
+    flex: 1,
+    minHeight: 44,
+    justifyContent: "center",
+    paddingHorizontal: 8
+  },
+  segmentButtonActive: {
+    backgroundColor: palette.green
+  },
+  segmentText: {
+    color: palette.green,
+    fontSize: 14,
+    fontWeight: "900",
+    textAlign: "center"
+  },
+  segmentTextActive: {
+    color: "#ffffff"
+  },
+  subFilterRow: {
+    gap: 8,
+    paddingBottom: 10
+  },
+  subFilterChip: {
+    backgroundColor: palette.panel,
+    borderColor: palette.line,
+    borderRadius: 8,
+    borderWidth: 1,
+    minHeight: 42,
+    justifyContent: "center",
+    paddingHorizontal: 13
+  },
+  subFilterChipActive: {
+    backgroundColor: "#eaf4ef",
+    borderColor: palette.green
+  },
+  subFilterText: {
+    color: palette.muted,
+    fontSize: 14,
+    fontWeight: "800"
+  },
+  subFilterTextActive: {
+    color: palette.green
   },
   pills: {
     gap: 8,
