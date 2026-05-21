@@ -4,25 +4,27 @@
     "slug": "jim-connect",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/jaipuria-logo.png",
     "userInterfaceStyle": "light",
     "splash": {
-      "image": "./assets/splash.png",
+      "image": "./assets/jaipuria-logo.png",
       "resizeMode": "contain",
-      "backgroundColor": "#f7f3ec"
+      "backgroundColor": "#1A5C38"
     },
     "assetBundlePatterns": [
       "**/*"
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "edu.jaipuriaindore.jimconnect"
+      "bundleIdentifier": "edu.jaipuriaindore.jimconnect",
+      "icon": "./assets/jaipuria-logo.png"
     },
     "android": {
       "package": "edu.jaipuriaindore.jimconnect",
+      "icon": "./assets/jaipuria-logo.png",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#f7f3ec"
+        "foregroundImage": "./assets/jaipuria-logo.png",
+        "backgroundColor": "#1A5C38"
       },
       "versionCode": 2
     },

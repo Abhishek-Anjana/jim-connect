@@ -45,7 +45,7 @@ const palette = {
   red: "#9d2832"
 };
 
-const jaipuriaLogo = require("./assets/jaipuria-logo.png");
+const jaipuriaLogo = require("./assets/jaipuria-wordmark.png");
 const campusImage = require("./assets/jaipuria-campus.jpg");
 
 const eventClubFilters = [
