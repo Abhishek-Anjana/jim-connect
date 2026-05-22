@@ -69,7 +69,11 @@ async function readBody(req) {
 
 function publicEvent(event) {
   const { published, reminderSent, ...rest } = event;
-  return rest;
+  return {
+    ...rest,
+    image_data: rest.image_data ?? "",
+    registration_link: rest.registration_link ?? ""
+  };
 }
 
 function normalizeEventForStore(item, existing = {}) {

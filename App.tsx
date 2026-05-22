@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Image,
   ImageBackground,
+  Linking,
+  Modal,
   Pressable,
   RefreshControl,
   SafeAreaView,
@@ -14,11 +16,11 @@ import {
   View
 } from "react-native";
 import { RemoteImage } from "./src/components/RemoteImage";
+import NoticesScreen from "./app/screens/NoticesScreen";
 import {
   ArchiveEntry,
   Club,
   Event,
-  Notice,
   Winner,
   clubs
 } from "./src/data/content";
@@ -26,7 +28,7 @@ import { useJimConnectContent } from "./src/hooks/useJimConnectContent";
 import { usePushNotifications } from "./src/hooks/usePushNotifications";
 import { sortArchiveEntries, sortUpcomingEvents } from "./src/utils/content";
 import { formatDate, formatDateTime, getEventTimingLabel } from "./src/utils/date";
-import { openExternalUrl, openHttpsUrl } from "./src/utils/links";
+import { openExternalUrl } from "./src/utils/links";
 import { shareArchiveEntry, shareEvent } from "./src/utils/share";
 
 type Tab = "events" | "archive" | "fame";
@@ -105,6 +107,7 @@ export default function App() {
   const [detail, setDetail] = useState<Detail>(null);
   const [showNotices, setShowNotices] = useState(false);
   const [pendingEventId, setPendingEventId] = useState<string | null>(null);
+  const hasUrgentNotice = notices.some((notice) => notice.priority === "Urgent");
   usePushNotifications(setPendingEventId);
 
   const visibleEvents = useMemo(() => {
@@ -180,14 +183,11 @@ export default function App() {
               <Text style={styles.title}>JIM-Connect</Text>
             </View>
           </View>
-          {detail || showNotices ? (
+          {detail ? (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Close current view"
-              onPress={() => {
-                setDetail(null);
-                setShowNotices(false);
-              }}
+              accessibilityLabel="Close detail view"
+              onPress={() => setDetail(null)}
               style={styles.iconButton}
             >
               <Ionicons name="close" size={22} color={palette.ink} />
@@ -200,21 +200,34 @@ export default function App() {
               style={styles.iconButton}
             >
               <Ionicons name="notifications-outline" size={22} color={palette.ink} />
-              {notices.length > 0 ? (
-                <View style={styles.noticeBadge}>
-                  <Text style={styles.noticeBadgeText}>{notices.length > 9 ? "9+" : notices.length}</Text>
-                </View>
-              ) : null}
+              {hasUrgentNotice ? <View style={styles.noticeDot} /> : null}
             </Pressable>
           )}
         </View>
         {!detail && !showNotices && error ? <Text style={styles.offlineBanner}>{error}</Text> : null}
         {!detail && !showNotices && lastUpdated ? <Text style={styles.updatedBanner}>Updated {formatDateTime(lastUpdated)}</Text> : null}
 
+        <Modal animationType="slide" visible={showNotices} onRequestClose={() => setShowNotices(false)}>
+          <SafeAreaView style={styles.safe}>
+            <View style={styles.shell}>
+              <View style={styles.header}>
+                <Text style={styles.title}>Notices</Text>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Close notices"
+                  onPress={() => setShowNotices(false)}
+                  style={styles.iconButton}
+                >
+                  <Ionicons name="close" size={22} color={palette.ink} />
+                </Pressable>
+              </View>
+              <NoticesScreen initialNotices={notices} />
+            </View>
+          </SafeAreaView>
+        </Modal>
+
         {detail ? (
           <DetailScreen detail={detail} />
-        ) : showNotices ? (
-          <NoticesScreen notices={notices} />
         ) : (
           <>
             <ScrollView
@@ -488,55 +501,6 @@ function eventImageUri(event: Event) {
   return event.image_data ? `data:image/jpeg;base64,${event.image_data}` : event.image;
 }
 
-function formatRelativeTime(value: string) {
-  const diffMs = Date.now() - new Date(value).getTime();
-  const diffMinutes = Math.max(0, Math.floor(diffMs / 60000));
-  if (diffMinutes < 1) return "Just now";
-  if (diffMinutes < 60) return `${diffMinutes} min ago`;
-  const diffHours = Math.floor(diffMinutes / 60);
-  if (diffHours < 24) return `${diffHours} hour${diffHours === 1 ? "" : "s"} ago`;
-  const diffDays = Math.floor(diffHours / 24);
-  return `${diffDays} day${diffDays === 1 ? "" : "s"} ago`;
-}
-
-function NoticesScreen({ notices }: { notices: Notice[] }) {
-  return (
-    <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-      <SectionHeading title="Dean's Notices" subtitle="Latest campus messages from academic and student offices" />
-      {notices.length === 0 ? (
-        <EmptyState icon="notifications-outline" title="No Active Notices" text="Published notices from campus offices will appear here." />
-      ) : (
-        notices.map((notice) => <NoticeCard key={notice.id} notice={notice} />)
-      )}
-    </ScrollView>
-  );
-}
-
-function NoticeCard({ notice }: { notice: Notice }) {
-  const priorityStyle =
-    notice.priority === "Urgent"
-      ? styles.noticeUrgent
-      : notice.priority === "Important"
-        ? styles.noticeImportant
-        : styles.noticeNormal;
-  return (
-    <View style={[styles.noticeCard, priorityStyle]}>
-      <View style={styles.noticeHeader}>
-        <View>
-          <Text style={styles.noticeOffice}>{notice.from_office}</Text>
-          <Text style={styles.noticeTime}>{formatRelativeTime(notice.created_at)}</Text>
-        </View>
-        <View style={styles.noticePriorityRow}>
-          {notice.priority === "Urgent" ? <View style={styles.urgentDot} /> : null}
-          <Text style={styles.noticePriority}>{notice.priority}</Text>
-        </View>
-      </View>
-      <Text style={styles.noticeTitle}>{notice.title}</Text>
-      <Text style={styles.noticeMessage}>{notice.message}</Text>
-    </View>
-  );
-}
-
 function DetailScreen({ detail }: { detail: Detail }) {
   const [driveError, setDriveError] = useState<string | null>(null);
   const [registerError, setRegisterError] = useState<string | null>(null);
@@ -567,12 +531,14 @@ function DetailScreen({ detail }: { detail: Detail }) {
             onPress={async () => {
               setRegisterError(null);
               try {
-                await openHttpsUrl(event.registration_link ?? "");
+                const url = event.registration_link ?? "";
+                new URL(url);
+                await Linking.openURL(url);
               } catch {
                 setRegisterError("Registration link must be a valid HTTPS URL.");
               }
             }}
-            style={styles.primaryButton}
+            style={styles.registerButton}
           >
             <Ionicons name="open-outline" size={19} color="#ffffff" />
             <Text style={styles.primaryButtonText}>Register Now</Text>
@@ -885,21 +851,16 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     width: 44
   },
-  noticeBadge: {
+  noticeDot: {
     alignItems: "center",
     backgroundColor: palette.red,
-    borderRadius: 9,
-    height: 18,
+    borderRadius: 6,
+    height: 12,
     justifyContent: "center",
-    minWidth: 18,
     position: "absolute",
-    right: -4,
-    top: -4
-  },
-  noticeBadgeText: {
-    color: "#ffffff",
-    fontSize: 10,
-    fontWeight: "900"
+    right: 3,
+    top: 3,
+    width: 12
   },
   content: {
     padding: 18,
@@ -1363,6 +1324,17 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     fontSize: 15,
     fontWeight: "900"
+  },
+  registerButton: {
+    alignItems: "center",
+    backgroundColor: palette.green,
+    borderRadius: 8,
+    flexDirection: "row",
+    gap: 8,
+    justifyContent: "center",
+    marginTop: 22,
+    minHeight: 50,
+    paddingHorizontal: 16
   },
   secondaryButton: {
     alignItems: "center",
