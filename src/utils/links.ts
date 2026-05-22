@@ -16,3 +16,12 @@ export async function openExternalUrl(value: string) {
 
   await Linking.openURL(value);
 }
+
+export async function openHttpsUrl(value: string) {
+  const url = new URL(value);
+  if (url.protocol !== "https:") {
+    throw new Error("Invalid HTTPS URL");
+  }
+
+  await Linking.openURL(value);
+}

@@ -4,8 +4,10 @@ import { existsSync } from "node:fs";
 import { dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import eventReminderJob from "./jobs/eventReminder.js";
+import noticesRoutes from "./routes/notices.js";
 
 const { startEventReminderJob } = eventReminderJob;
+const { handleNoticeRoute } = noticesRoutes;
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const storePath = process.env.STORE_PATH ? resolve(process.env.STORE_PATH) : join(root, "server", "data", "store.json");
@@ -70,6 +72,19 @@ function publicEvent(event) {
   return rest;
 }
 
+function normalizeEventForStore(item, existing = {}) {
+  const reminderValue = item.reminder_sent ?? item.reminderSent ?? existing.reminderSent ?? existing.reminder_sent ?? false;
+  return {
+    ...existing,
+    ...item,
+    image: item.image ?? existing.image ?? "",
+    image_data: item.image_data ?? existing.image_data ?? "",
+    registration_link: item.registration_link ?? existing.registration_link ?? "",
+    reminder_sent: Boolean(reminderValue),
+    reminderSent: Boolean(reminderValue)
+  };
+}
+
 function requireAdmin(req, res) {
   const store = req.store;
   const token = req.headers["x-admin-token"];
@@ -84,7 +99,7 @@ function requireAdmin(req, res) {
 
 function canWrite(admin, module) {
   if (admin.role === "Super Admin") return true;
-  if (admin.role === "Content Manager") return ["events", "archive", "winners"].includes(module);
+  if (admin.role === "Content Manager") return ["events", "archive", "winners", "notices"].includes(module);
   return false;
 }
 
@@ -132,18 +147,29 @@ function validateAdminItem(module, item, store) {
   requireString(item, "id", errors);
 
   if (module === "events") {
-    for (const field of ["name", "startsAt", "endsAt", "venue", "club", "image", "description"]) {
+    item = normalizeEventForStore(item, store.events?.find((event) => event.id === item.id));
+    for (const field of ["name", "startsAt", "endsAt", "venue", "club", "description"]) {
       requireString(item, field, errors);
     }
+    if (!item.image_data && !item.image) errors.push("image upload is required");
     if (Number.isNaN(Date.parse(item.startsAt)) || Number.isNaN(Date.parse(item.endsAt))) {
       errors.push("startsAt and endsAt must be valid date strings");
     } else if (new Date(item.endsAt) <= new Date(item.startsAt)) {
       errors.push("endsAt must be after startsAt");
     }
     if (item.image && !isHttpsUrl(item.image)) errors.push("image must be an HTTPS URL");
+    if (item.registration_link && !isHttpsUrl(item.registration_link)) errors.push("registration_link must be an HTTPS URL");
+    if (item.image_data && typeof item.image_data !== "string") errors.push("image_data must be a base64 string");
     if (!Array.isArray(item.speakers)) errors.push("speakers must be an array");
     if (!Array.isArray(item.attachments)) errors.push("attachments must be an array");
     if (typeof item.published !== "boolean") errors.push("published must be true or false");
+  }
+
+  if (module === "notices") {
+    for (const field of ["title", "message", "from_office"]) requireString(item, field, errors);
+    if (!["Normal", "Important", "Urgent"].includes(item.priority)) {
+      errors.push("priority must be Normal, Important, or Urgent");
+    }
   }
 
   if (module === "archive") {
@@ -305,7 +331,33 @@ const server = createServer(async (req, res) => {
     }
 
     const store = await readStore();
+    store.events ??= [];
+    store.archive ??= [];
+    store.winners ??= [];
+    store.admins ??= [];
+    store.pushTokens ??= [];
+    store.notifications ??= [];
+    store.auditLog ??= [];
+    store.notices ??= [];
     req.store = store;
+
+    if (
+      await handleNoticeRoute({
+        audit,
+        canWrite,
+        path,
+        readBody,
+        req,
+        requireAdmin,
+        res,
+        send,
+        sendPushNotification: sendEventPushNotification,
+        store,
+        writeStore
+      })
+    ) {
+      return;
+    }
 
     if (req.method === "GET" && path === "/events/upcoming") {
       const now = new Date();
@@ -345,6 +397,37 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    const adminEventMatch = path.match(/^\/admin\/events(?:\/([^/]+))?$/);
+    if (adminEventMatch && (req.method === "POST" || req.method === "PUT")) {
+      const admin = requireAdmin(req, res);
+      if (!admin) return;
+      if (!canWrite(admin, "events")) {
+        send(res, 403, { error: "This role cannot modify this module" });
+        return;
+      }
+      const body = await readBody(req);
+      const [, routeId] = adminEventMatch;
+      if (routeId) body.id = routeId;
+      if (!body.id) body.id = `events-${Date.now()}`;
+      const existing = store.events.find((event) => event.id === body.id);
+      const item = normalizeEventForStore(body, existing);
+      const errors = validateAdminItem("events", item, store);
+      if (errors.length > 0) {
+        send(res, 400, { errors });
+        return;
+      }
+      const wasPublished = Boolean(existing?.published);
+      const action = upsert(store.events, item);
+      audit(store, action, "events", item.id, admin.email ?? admin.name);
+      if (item.published && !wasPublished) {
+        await notifyEventPublished(store, item);
+        audit(store, "notify", "events", item.id, admin.email ?? admin.name);
+      }
+      await writeStore(store);
+      send(res, 200, item);
+      return;
+    }
+
     if (path === "/admin/api/store" && req.method === "GET") {
       const admin = requireAdmin(req, res);
       if (!admin) return;
@@ -355,7 +438,7 @@ const server = createServer(async (req, res) => {
       return;
     }
 
-    const adminMatch = path.match(/^\/admin\/api\/(events|archive|winners|admins|notifications|push-tokens|audit)$/);
+    const adminMatch = path.match(/^\/admin\/api\/(events|archive|winners|admins|notifications|push-tokens|audit|notices)$/);
     if (adminMatch) {
       const admin = requireAdmin(req, res);
       if (!admin) return;
@@ -374,7 +457,8 @@ const server = createServer(async (req, res) => {
         return;
       }
       if (req.method === "POST" || req.method === "PUT") {
-        const item = await readBody(req);
+        const body = await readBody(req);
+        const item = module === "events" ? normalizeEventForStore(body, store.events.find((event) => event.id === body.id)) : body;
         if (!item.id) item.id = `${module}-${Date.now()}`;
         const errors = validateAdminItem(module, item, store);
         if (errors.length > 0) {

@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { ArchiveEntry, Event, Winner, archiveEntries, upcomingEvents, winners } from "../data/content";
-import { getArchiveEntries, getUpcomingEvents, getWinners } from "../services/jimConnectApi";
+import { ArchiveEntry, Event, Notice, Winner, archiveEntries, notices, upcomingEvents, winners } from "../data/content";
+import { getArchiveEntries, getNotices, getUpcomingEvents, getWinners } from "../services/jimConnectApi";
 import {
   assertContentRelations,
   isValidArchiveEntry,
   isValidEvent,
+  isValidNotice,
   isValidWinner,
   validateArray
 } from "../services/contentGuards";
@@ -14,6 +15,7 @@ type CachedContent = {
   archive: ArchiveEntry[];
   events: Event[];
   fame: Winner[];
+  notices: Notice[];
   savedAt: string;
 };
 
@@ -29,6 +31,7 @@ export function parseCachedContentForTest(value: string): CachedContent {
   const cachedEvents = validateArray(record.events, isValidEvent, "cached events");
   const cachedArchive = validateArray(record.archive, isValidArchiveEntry, "cached archive entries");
   const cachedFame = validateArray(record.fame, isValidWinner, "cached hall of fame");
+  const cachedNotices = record.notices === undefined ? notices : validateArray(record.notices, isValidNotice, "cached notices");
 
   if (typeof record.savedAt !== "string" || Number.isNaN(Date.parse(record.savedAt))) {
     throw new Error("Invalid cache timestamp");
@@ -40,6 +43,7 @@ export function parseCachedContentForTest(value: string): CachedContent {
     archive: cachedArchive,
     events: cachedEvents,
     fame: cachedFame,
+    notices: cachedNotices,
     savedAt: record.savedAt
   };
 }
@@ -48,6 +52,7 @@ export function useJimConnectContent() {
   const [events, setEvents] = useState<Event[]>(upcomingEvents);
   const [archive, setArchive] = useState<ArchiveEntry[]>(archiveEntries);
   const [fame, setFame] = useState<Winner[]>(winners);
+  const [noticeItems, setNoticeItems] = useState<Notice[]>(notices);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -62,6 +67,7 @@ export function useJimConnectContent() {
       setEvents(parsed.events);
       setArchive(parsed.archive);
       setFame(parsed.fame);
+      setNoticeItems(parsed.notices);
       setLastUpdated(parsed.savedAt);
     } catch {
       await AsyncStorage.removeItem(CACHE_KEY);
@@ -77,15 +83,17 @@ export function useJimConnectContent() {
     setError(null);
 
     try {
-      const [nextEvents, nextArchive, nextFame] = await Promise.all([
+      const [nextEvents, nextArchive, nextFame, nextNotices] = await Promise.all([
         getUpcomingEvents(),
         getArchiveEntries(),
-        getWinners()
+        getWinners(),
+        getNotices()
       ]);
       assertContentRelations(nextEvents, nextArchive, nextFame);
       setEvents(nextEvents);
       setArchive(nextArchive);
       setFame(nextFame);
+      setNoticeItems(nextNotices);
       const savedAt = new Date().toISOString();
       setLastUpdated(savedAt);
       await AsyncStorage.setItem(
@@ -94,6 +102,7 @@ export function useJimConnectContent() {
           archive: nextArchive,
           events: nextEvents,
           fame: nextFame,
+          notices: nextNotices,
           savedAt
         } satisfies CachedContent)
       );
@@ -124,6 +133,7 @@ export function useJimConnectContent() {
     fame,
     lastUpdated,
     loading,
+    notices: noticeItems,
     refresh: () => load(true),
     refreshing
   };

@@ -1,7 +1,7 @@
-import { archiveEntries, upcomingEvents, winners } from "../data/content";
+import { archiveEntries, notices, upcomingEvents, winners } from "../data/content";
 import { config } from "../config/env";
 import { sortArchiveEntries, sortUpcomingEvents, sortWinners } from "../utils/content";
-import { isValidArchiveEntry, isValidEvent, isValidWinner, validateArray } from "./contentGuards";
+import { isValidArchiveEntry, isValidEvent, isValidNotice, isValidWinner, validateArray } from "./contentGuards";
 
 async function delay(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -43,4 +43,11 @@ export async function getArchiveEntries() {
 export async function getWinners() {
   const response = await fetchJson<unknown>("/hall-of-fame", winners);
   return sortWinners(validateArray(response, isValidWinner, "hall of fame"));
+}
+
+export async function getNotices() {
+  const response = await fetchJson<unknown>("/notices", notices);
+  return validateArray(response, isValidNotice, "notices").sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  );
 }

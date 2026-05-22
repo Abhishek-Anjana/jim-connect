@@ -8,6 +8,8 @@ create table if not exists events (
   venue text not null,
   club text not null,
   image text not null,
+  image_data text,
+  registration_link text,
   description text not null,
   speakers jsonb not null default '[]'::jsonb,
   attachments jsonb not null default '[]'::jsonb,
@@ -82,6 +84,16 @@ create table if not exists notifications (
   constraint notifications_token_count_check check (token_count >= 0)
 );
 
+create table if not exists notices (
+  id serial primary key,
+  title varchar(255) not null,
+  message text not null,
+  from_office varchar(100) not null,
+  priority varchar(20) default 'Normal',
+  created_at timestamp default now(),
+  is_active boolean default true
+);
+
 create table if not exists audit_log (
   id text primary key,
   action text not null,
@@ -96,3 +108,4 @@ create index if not exists events_published_starts_at_idx on events (published, 
 create index if not exists archive_date_idx on archive (date desc);
 create index if not exists hall_of_fame_archive_id_idx on hall_of_fame (archive_id);
 create index if not exists audit_log_timestamp_idx on audit_log (timestamp desc);
+create index if not exists notices_created_at_idx on notices (created_at desc);

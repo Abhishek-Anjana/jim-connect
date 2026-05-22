@@ -65,6 +65,13 @@ try {
   await waitForServer();
   const events = await api("/events/upcoming");
   assert.ok(events.length >= 1);
+  const blockedNoticeResponse = await fetch(`${baseUrl}/admin/notices`, {
+    body: JSON.stringify({ title: "Blocked" }),
+    headers: { "Content-Type": "application/json" },
+    method: "POST"
+  });
+  assert.equal(blockedNoticeResponse.status, 401);
+  assert.ok(Array.isArray(await api("/notices")));
 
   assert.equal(
     await apiStatus("/admin/api/archive", {
@@ -96,9 +103,11 @@ try {
       description: "Published by the automated API smoke test.",
       endsAt: "2026-06-01T12:00:00+05:30",
       id: "api-smoke-event",
-      image: "https://example.com/event.jpg",
+      image_data: "dGVzdA==",
       name: "API Smoke Event",
       published: true,
+      registration_link: "https://forms.gle/example",
+      reminder_sent: false,
       speakers: [],
       startsAt: "2026-06-01T10:00:00+05:30",
       venue: "Test Hall"
@@ -114,6 +123,37 @@ try {
   assert.equal(store.notifications[0].payload.title, "New Event at JIM! 🎉");
   assert.equal(store.notifications[0].payload.body, "API Smoke Event has been added. Tap to view details.");
   assert.ok(store.auditLog.some((entry) => entry.action === "notify" && entry.idRef === "api-smoke-event"));
+
+  const updatedEvents = await api("/events/upcoming");
+  const smokeEvent = updatedEvents.find((event) => event.id === "api-smoke-event");
+  assert.equal(smokeEvent.registration_link, "https://forms.gle/example");
+  assert.equal(smokeEvent.image_data, "dGVzdA==");
+  assert.equal(smokeEvent.reminder_sent, false);
+
+  const notice = await api("/admin/notices", {
+    body: JSON.stringify({
+      from_office: "Dean Academics",
+      message: "This notice was created by the API smoke test.",
+      priority: "Important",
+      title: "API Smoke Notice"
+    }),
+    method: "POST"
+  });
+  assert.equal(notice.title, "API Smoke Notice");
+  assert.equal(notice.from_office, "Dean Academics");
+  const notices = await api("/notices");
+  assert.ok(notices.some((entry) => entry.id === notice.id));
+  const toggledNotice = await api(`/admin/notices/${notice.id}`, {
+    body: JSON.stringify({ is_active: true }),
+    method: "PATCH"
+  });
+  assert.equal(toggledNotice.id, notice.id);
+  await api(`/admin/notices/${notice.id}`, { method: "DELETE" });
+  const activeNotices = await api("/notices");
+  assert.equal(activeNotices.some((entry) => entry.id === notice.id), false);
+  const storeAfterNotice = await api("/admin/api/store");
+  assert.ok(storeAfterNotice.auditLog.some((entry) => entry.action === "notice_created" && entry.idRef === notice.id));
+  assert.ok(storeAfterNotice.auditLog.some((entry) => entry.action === "notice_deleted" && entry.idRef === notice.id));
 
   const viewerResponse = await fetch(`${baseUrl}/admin/api/store`, {
     headers: { "X-Admin-Token": "jim-viewer-dev" }

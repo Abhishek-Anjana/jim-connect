@@ -197,6 +197,39 @@ button.danger {
   font-size: 13px;
 }
 
+.date-preview {
+  background: #eaf4ef;
+  border: 1px solid #c8e2d7;
+  border-radius: 8px;
+  color: #0f6b57;
+  font-weight: 900;
+  padding: 10px 12px;
+}
+
+.preview-image {
+  aspect-ratio: 16 / 9;
+  border: 1px solid #d9cbb8;
+  border-radius: 8px;
+  object-fit: cover;
+  width: 100%;
+}
+
+.notice-card {
+  border-left-width: 6px;
+}
+
+.notice-normal {
+  border-left-color: #2d74c4;
+}
+
+.notice-important {
+  border-left-color: #c96d1d;
+}
+
+.notice-urgent {
+  border-left-color: #9d2832;
+}
+
 @media (max-width: 860px) {
   header,
   .brand,

@@ -8,6 +8,8 @@ export type Event = {
   venue: string;
   club: Exclude<Club, "All">;
   image: string;
+  image_data?: string;
+  registration_link?: string;
   description: string;
   speakers: string[];
   attachments: string[];
@@ -36,6 +38,16 @@ export type Winner = {
   archiveId: string;
   portrait: string;
   champion: boolean;
+};
+
+export type Notice = {
+  id: string;
+  title: string;
+  message: string;
+  from_office: string;
+  priority: "Normal" | "Important" | "Urgent";
+  created_at: string;
+  is_active: boolean;
 };
 
 export const clubs: Club[] = [
@@ -89,6 +101,18 @@ export const upcomingEvents: Event[] = [
       "An applied finance simulation where students analyze market signals, balance risk, and defend portfolio choices across timed rounds.",
     speakers: ["Finance Club Core Team"],
     attachments: ["Simulation rules"]
+  }
+];
+
+export const notices: Notice[] = [
+  {
+    id: "notice-1",
+    title: "Welcome to JIM-Connect",
+    message: "Campus notices from the Dean's Office and student support teams will appear here.",
+    from_office: "Dean Academics",
+    priority: "Normal",
+    created_at: "2026-05-01T09:00:00+05:30",
+    is_active: true
   }
 ];
 

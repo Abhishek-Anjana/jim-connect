@@ -1,4 +1,4 @@
-import { ArchiveEntry, Event, Winner } from "../data/content";
+import { ArchiveEntry, Event, Notice, Winner } from "../data/content";
 import { isGoogleDriveUrl } from "../utils/links";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -17,6 +17,10 @@ function isHttpsUrl(value: string) {
   }
 }
 
+function hasOptionalHttpsUrl(value: Record<string, unknown>, key: string) {
+  return value[key] === undefined || (typeof value[key] === "string" && isHttpsUrl(value[key]));
+}
+
 function hasUniqueIds(items: Array<{ id: string }>, label: string) {
   const ids = new Set(items.map((item) => item.id));
   if (ids.size !== items.length) {
@@ -33,7 +37,6 @@ export function isValidEvent(value: unknown): value is Event {
     !hasString(value, "endsAt") ||
     !hasString(value, "venue") ||
     !hasString(value, "club") ||
-    !hasString(value, "image") ||
     !hasString(value, "description")
   ) {
     return false;
@@ -52,8 +55,24 @@ export function isValidEvent(value: unknown): value is Event {
     !Number.isNaN(Date.parse(startsAt)) &&
     !Number.isNaN(Date.parse(endsAt)) &&
     new Date(endsAt) > new Date(startsAt) &&
-    typeof value.image === "string" &&
-    isHttpsUrl(value.image)
+    ((typeof value.image === "string" && isHttpsUrl(value.image)) ||
+      (typeof value.image_data === "string" && value.image_data.trim().length > 0)) &&
+    hasOptionalHttpsUrl(value, "registration_link")
+  );
+}
+
+export function isValidNotice(value: unknown): value is Notice {
+  if (!isRecord(value)) return false;
+  return (
+    hasString(value, "id") &&
+    hasString(value, "title") &&
+    hasString(value, "message") &&
+    hasString(value, "from_office") &&
+    typeof value.priority === "string" &&
+    ["Normal", "Important", "Urgent"].includes(value.priority) &&
+    typeof value.created_at === "string" &&
+    !Number.isNaN(Date.parse(value.created_at)) &&
+    typeof value.is_active === "boolean"
   );
 }
 

@@ -153,6 +153,17 @@
       "champion": false
     }
   ],
+  "notices": [
+    {
+      "id": "notice-1",
+      "title": "Welcome to JIM-Connect",
+      "message": "Campus notices from the Dean's Office and student support teams will appear here.",
+      "from_office": "Dean Academics",
+      "priority": "Normal",
+      "created_at": "2026-05-01T09:00:00+05:30",
+      "is_active": true
+    }
+  ],
   "pushTokens": [],
   "notifications": [],
   "admins": [
