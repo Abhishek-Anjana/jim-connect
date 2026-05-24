@@ -103,9 +103,10 @@ export default function App() {
   const [eventSubFilter, setEventSubFilter] = useState<string | null>(null);
   const [archiveFilterGroup, setArchiveFilterGroup] = useState<EventFilterGroup>("All");
   const [archiveSubFilter, setArchiveSubFilter] = useState<string | null>(null);
+  const [fameFilterGroup, setFameFilterGroup] = useState<EventFilterGroup>("All");
+  const [fameSubFilter, setFameSubFilter] = useState<string | null>(null);
   const [archiveQuery, setArchiveQuery] = useState("");
   const [winnerBatch, setWinnerBatch] = useState("All");
-  const [winnerCategory, setWinnerCategory] = useState("All");
   const [archivePage, setArchivePage] = useState(1);
   const [detail, setDetail] = useState<Detail>(null);
   const [showNotices, setShowNotices] = useState(false);
@@ -152,17 +153,22 @@ export default function App() {
   }, [archiveFilterGroup, archiveQuery, archiveSubFilter]);
 
   const batches = ["All", "2025-27", "2026-28"];
-  const categories = ["All", ...Array.from(new Set(fame.map((winner) => winner.category)))];
-
   const visibleWinners = useMemo(
     () =>
       fame.filter((winner) => {
-        const matchesClub = club === "All" || winner.club === club;
+        const groupFilters = fameFilterGroup === "Clubs" ? eventClubFilters : fameFilterGroup === "Committees" ? eventCommitteeFilters : [];
+        const allowed = new Set(groupFilters.map(normalizeFilterName));
+        const winnerClub = normalizeFilterName(canonicalEventClub(winner.club));
+        const matchesClub =
+          fameFilterGroup === "All"
+            ? true
+            : fameSubFilter
+              ? winnerClub === normalizeFilterName(fameSubFilter)
+              : allowed.has(winnerClub);
         const matchesBatch = winnerBatch === "All" || winner.batch === winnerBatch;
-        const matchesCategory = winnerCategory === "All" || winner.category === winnerCategory;
-        return matchesClub && matchesBatch && matchesCategory;
+        return matchesClub && matchesBatch;
       }),
-    [club, fame, winnerBatch, winnerCategory]
+    [fame, fameFilterGroup, fameSubFilter, winnerBatch]
   );
 
   useEffect(() => {
@@ -295,11 +301,15 @@ export default function App() {
                   club={club}
                   setClub={setClub}
                   batches={batches}
-                  categories={categories}
+                  filterGroup={fameFilterGroup}
+                  setFilterGroup={(nextGroup) => {
+                    setFameFilterGroup(nextGroup);
+                    setFameSubFilter(null);
+                  }}
+                  subFilter={fameSubFilter}
+                  setSubFilter={setFameSubFilter}
                   winnerBatch={winnerBatch}
                   setWinnerBatch={setWinnerBatch}
-                  winnerCategory={winnerCategory}
-                  setWinnerCategory={setWinnerCategory}
                   winners={visibleWinners}
                   openArchive={openArchiveFromWinner}
                 />
@@ -475,22 +485,24 @@ function HallOfFameScreen({
   club,
   setClub,
   batches,
-  categories,
+  filterGroup,
+  setFilterGroup,
+  subFilter,
+  setSubFilter,
   winnerBatch,
   setWinnerBatch,
-  winnerCategory,
-  setWinnerCategory,
   winners: visibleWinners,
   openArchive
 }: {
   club: Club;
   setClub: (club: Club) => void;
   batches: string[];
-  categories: string[];
+  filterGroup: EventFilterGroup;
+  setFilterGroup: (group: EventFilterGroup) => void;
+  subFilter: string | null;
+  setSubFilter: (filter: string) => void;
   winnerBatch: string;
   setWinnerBatch: (batch: string) => void;
-  winnerCategory: string;
-  setWinnerCategory: (category: string) => void;
   winners: Winner[];
   openArchive: (winner: Winner) => void;
 }) {
@@ -508,13 +520,16 @@ function HallOfFameScreen({
           </ScrollView>
         </View>
       ) : null}
-      <ClubFilter selected={club} setSelected={setClub} />
+      <EventTypeFilter
+        group={filterGroup}
+        setGroup={setFilterGroup}
+        subFilter={subFilter}
+        setSubFilter={setSubFilter}
+      />
       <Text style={styles.filterLabel}>Batch</Text>
       <PillRow values={batches} selected={winnerBatch} setSelected={setWinnerBatch} />
-      <Text style={styles.filterLabel}>Award Category</Text>
-      <PillRow values={categories} selected={winnerCategory} setSelected={setWinnerCategory} />
       {visibleWinners.length === 0 ? (
-        <EmptyState icon="trophy-outline" title="No Winners Match" text="Try a different batch, award category, or club filter." />
+        <EmptyState icon="trophy-outline" title="No Winners Match" text="Try a different batch or club/committee filter." />
       ) : (
         <View style={styles.winnerGrid}>
           {visibleWinners.map((winner) => (
@@ -976,7 +991,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: palette.card,
     borderColor: palette.green,
-    borderRadius: 8,
+    borderRadius: 20,
     borderWidth: 1,
     flex: 1,
     minHeight: 44,
@@ -1000,25 +1015,25 @@ const styles = StyleSheet.create({
     paddingBottom: 10
   },
   subFilterChip: {
-    backgroundColor: palette.panel,
+    backgroundColor: palette.card,
     borderColor: palette.line,
-    borderRadius: 8,
+    borderRadius: 20,
     borderWidth: 1,
     minHeight: 42,
     justifyContent: "center",
     paddingHorizontal: 13
   },
   subFilterChipActive: {
-    backgroundColor: "#eaf4ef",
-    borderColor: palette.green
+    backgroundColor: "#C9A84C",
+    borderColor: "#C9A84C"
   },
   subFilterText: {
     color: palette.muted,
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: "800"
   },
   subFilterTextActive: {
-    color: palette.green
+    color: "#ffffff"
   },
   pills: {
     gap: 8,
