@@ -45,6 +45,10 @@ const logout = document.querySelector("#logout");
 const nav = document.querySelector("nav");
 const status = document.querySelector("#status");
 const token = document.querySelector("#token");
+const toast = document.createElement("div");
+toast.id = "toast";
+toast.hidden = true;
+document.body.appendChild(toast);
 token.value = sessionStorage.getItem("jim-admin-token") ?? "";
 
 function headers() {
@@ -67,6 +71,19 @@ async function request(path, options = {}) {
 
 function setStatus(message) {
   status.textContent = message;
+}
+
+function showPushToast() {
+  toast.textContent = "✅ Push notification sent to all students";
+  toast.hidden = false;
+  toast.classList.add("show");
+  window.clearTimeout(showPushToast.timer);
+  showPushToast.timer = window.setTimeout(() => {
+    toast.classList.remove("show");
+    window.setTimeout(() => {
+      toast.hidden = true;
+    }, 350);
+  }, 3000);
 }
 
 function canWrite(module) {
@@ -196,6 +213,9 @@ function renderForm(module, item = emptyFor(module)) {
           if (field === "role") {
             return `<label>${field}<select name="${field}"><option ${item[field] === "Super Admin" ? "selected" : ""}>Super Admin</option><option ${item[field] === "Content Manager" ? "selected" : ""}>Content Manager</option><option ${item[field] === "Read-Only Viewer" ? "selected" : ""}>Read-Only Viewer</option></select></label>`;
           }
+          if (module === "winners" && field === "batch") {
+            return `<label>batch<select name="${field}"><option ${item[field] === "2025-27" ? "selected" : ""}>2025-27</option><option ${item[field] === "2026-28" ? "selected" : ""}>2026-28</option></select></label>`;
+          }
           if (["published", "champion", "active"].includes(field)) {
             return `<label>${field}<select name="${field}"><option value="false" ${!item[field] ? "selected" : ""}>false</option><option value="true" ${item[field] ? "selected" : ""}>true</option></select></label>`;
           }
@@ -300,6 +320,8 @@ function renderDashboard() {
   const publishedEvents = (store.events ?? []).filter((event) => event.published).length;
   const draftEvents = (store.events ?? []).filter((event) => !event.published).length;
   const activeAdmins = (store.admins ?? []).filter((admin) => admin.active).length;
+  const today = new Date().toDateString();
+  const notificationsToday = (store.notifications ?? []).filter((entry) => new Date(entry.sentAt).toDateString() === today).length;
   content.innerHTML = `
     <section class="stats">
       <article class="card"><h3>${store.currentAdmin?.role ?? "Admin"}</h3><p class="meta">${store.currentAdmin?.email ?? ""}</p></article>
@@ -308,6 +330,7 @@ function renderDashboard() {
       <article class="card"><h3>${store.archive?.length ?? 0}</h3><p class="meta">Archive entries</p></article>
       <article class="card"><h3>${store.winners?.length ?? 0}</h3><p class="meta">Hall of Fame profiles</p></article>
       <article class="card"><h3>${store.pushTokens?.length ?? 0}</h3><p class="meta">Registered push tokens</p></article>
+      <article class="card"><h3>${notificationsToday}</h3><p class="meta">Notifications Sent Today</p></article>
       <article class="card"><h3>${activeAdmins}</h3><p class="meta">Active admin users</p></article>
     </section>
     <section class="panel">
@@ -383,6 +406,7 @@ content.addEventListener("click", async (event) => {
   if (deleteId) {
     try {
       await request(`/admin/api/${active}/${deleteId}`, { method: "DELETE" });
+      if (active === "events") showPushToast();
       await load();
     } catch (error) {
       setStatus(error.message);
@@ -410,6 +434,7 @@ content.addEventListener("submit", async (event) => {
     };
     try {
       await request("/admin/notices", { body: JSON.stringify(notice), method: "POST" });
+      showPushToast();
       await load();
     } catch (error) {
       setStatus(error.message);
@@ -427,6 +452,7 @@ content.addEventListener("submit", async (event) => {
   }
   try {
     await request(`/admin/api/${active}`, { body: JSON.stringify(item), method: "POST" });
+    if (["events", "archive", "winners"].includes(active)) showPushToast();
     await load();
   } catch (error) {
     setStatus(error.message);

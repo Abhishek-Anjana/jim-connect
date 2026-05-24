@@ -118,10 +118,9 @@ try {
   const store = await api("/admin/api/store");
   assert.equal(store.lastNotification.tokenCount, 1);
   assert.equal(store.notifications.length, 1);
-  assert.equal(store.notifications[0].payload.data.eventId, "api-smoke-event");
-  assert.equal(store.notifications[0].payload.data.screen, "EventDetail");
-  assert.equal(store.notifications[0].payload.title, "New Event at JIM! 🎉");
-  assert.equal(store.notifications[0].payload.body, "API Smoke Event has been added. Tap to view details.");
+  assert.equal(store.notifications[0].payload.data.screen, "Events");
+  assert.equal(store.notifications[0].payload.title, "🎉 New Event Added!");
+  assert.equal(store.notifications[0].payload.body, "API Smoke Event by Student Affairs - Tap to view");
   assert.ok(store.auditLog.some((entry) => entry.action === "notify" && entry.idRef === "api-smoke-event"));
 
   const updatedEvents = await api("/events/upcoming");

@@ -34,6 +34,7 @@ import { shareArchiveEntry, shareEvent } from "./src/utils/share";
 type Tab = "events" | "archive" | "fame";
 type Detail = { type: "event"; item: Event } | { type: "archive"; item: ArchiveEntry } | null;
 type EventFilterGroup = "All" | "Clubs" | "Committees";
+type NotificationTarget = { eventId?: string; screen: string };
 
 const palette = {
   ink: "#202124",
@@ -42,7 +43,7 @@ const palette = {
   panel: "#fffaf2",
   card: "#ffffff",
   line: "#e5d8c7",
-  green: "#0f6b57",
+  green: "#1A5C38",
   teal: "#1c7c84",
   gold: "#b87910",
   red: "#9d2832"
@@ -100,15 +101,17 @@ export default function App() {
   const [club, setClub] = useState<Club>("All");
   const [eventFilterGroup, setEventFilterGroup] = useState<EventFilterGroup>("All");
   const [eventSubFilter, setEventSubFilter] = useState<string | null>(null);
+  const [archiveFilterGroup, setArchiveFilterGroup] = useState<EventFilterGroup>("All");
+  const [archiveSubFilter, setArchiveSubFilter] = useState<string | null>(null);
   const [archiveQuery, setArchiveQuery] = useState("");
   const [winnerBatch, setWinnerBatch] = useState("All");
   const [winnerCategory, setWinnerCategory] = useState("All");
   const [archivePage, setArchivePage] = useState(1);
   const [detail, setDetail] = useState<Detail>(null);
   const [showNotices, setShowNotices] = useState(false);
-  const [pendingEventId, setPendingEventId] = useState<string | null>(null);
+  const [pendingNotification, setPendingNotification] = useState<NotificationTarget | null>(null);
   const hasUrgentNotice = notices.some((notice) => notice.priority === "Urgent");
-  usePushNotifications(setPendingEventId);
+  usePushNotifications(setPendingNotification);
 
   const visibleEvents = useMemo(() => {
     if (eventFilterGroup === "All") return sortUpcomingEvents(events);
@@ -124,9 +127,17 @@ export default function App() {
 
   const visibleArchive = useMemo(() => {
     const query = archiveQuery.trim().toLowerCase();
+    const groupFilters = archiveFilterGroup === "Clubs" ? eventClubFilters : archiveFilterGroup === "Committees" ? eventCommitteeFilters : [];
+    const allowed = new Set(groupFilters.map(normalizeFilterName));
     return sortArchiveEntries(archive)
       .filter((entry) => {
-        const matchesClub = club === "All" || entry.club === club;
+        const entryClub = normalizeFilterName(canonicalEventClub(entry.club));
+        const matchesClub =
+          archiveFilterGroup === "All"
+            ? true
+            : archiveSubFilter
+              ? entryClub === normalizeFilterName(archiveSubFilter)
+              : allowed.has(entryClub);
         const matchesQuery =
           query.length === 0 ||
           entry.name.toLowerCase().includes(query) ||
@@ -134,13 +145,13 @@ export default function App() {
           entry.year.includes(query);
         return matchesClub && matchesQuery;
       });
-  }, [archive, archiveQuery, club]);
+  }, [archive, archiveFilterGroup, archiveQuery, archiveSubFilter]);
 
   useEffect(() => {
     setArchivePage(1);
-  }, [archiveQuery, club]);
+  }, [archiveFilterGroup, archiveQuery, archiveSubFilter]);
 
-  const batches = ["All", ...Array.from(new Set(fame.map((winner) => winner.batch)))];
+  const batches = ["All", "2025-27", "2026-28"];
   const categories = ["All", ...Array.from(new Set(fame.map((winner) => winner.category)))];
 
   const visibleWinners = useMemo(
@@ -155,14 +166,24 @@ export default function App() {
   );
 
   useEffect(() => {
-    if (!pendingEventId) return;
-    const event = events.find((item) => item.id === pendingEventId);
-    if (!event) return;
-    setTab("events");
+    if (!pendingNotification) return;
     setShowNotices(false);
-    setDetail({ type: "event", item: event });
-    setPendingEventId(null);
-  }, [events, pendingEventId]);
+    setDetail(null);
+    if (pendingNotification.screen === "EventDetail" && pendingNotification.eventId) {
+      const event = events.find((item) => item.id === pendingNotification.eventId);
+      if (event) setDetail({ type: "event", item: event });
+      setTab("events");
+    } else if (pendingNotification.screen === "Archive") {
+      setTab("archive");
+    } else if (pendingNotification.screen === "HallOfFame") {
+      setTab("fame");
+    } else if (pendingNotification.screen === "Notices") {
+      setShowNotices(true);
+    } else {
+      setTab("events");
+    }
+    setPendingNotification(null);
+  }, [events, pendingNotification]);
 
   function openArchiveFromWinner(winner: Winner) {
     const linkedArchive = archive.find((entry) => entry.id === winner.archiveId);
@@ -253,6 +274,13 @@ export default function App() {
                 <ArchiveScreen
                   club={club}
                   setClub={setClub}
+                  filterGroup={archiveFilterGroup}
+                  setFilterGroup={(nextGroup) => {
+                    setArchiveFilterGroup(nextGroup);
+                    setArchiveSubFilter(null);
+                  }}
+                  subFilter={archiveSubFilter}
+                  setSubFilter={setArchiveSubFilter}
                   query={archiveQuery}
                   setQuery={setArchiveQuery}
                   entries={visibleArchive.slice(0, archivePage * 20)}
@@ -381,6 +409,10 @@ function EventTypeFilter({
 function ArchiveScreen({
   club,
   setClub,
+  filterGroup,
+  setFilterGroup,
+  subFilter,
+  setSubFilter,
   query,
   setQuery,
   entries,
@@ -391,6 +423,10 @@ function ArchiveScreen({
 }: {
   club: Club;
   setClub: (club: Club) => void;
+  filterGroup: EventFilterGroup;
+  setFilterGroup: (group: EventFilterGroup) => void;
+  subFilter: string | null;
+  setSubFilter: (filter: string) => void;
   query: string;
   setQuery: (query: string) => void;
   entries: ArchiveEntry[];
@@ -412,7 +448,12 @@ function ArchiveScreen({
           style={styles.searchInput}
         />
       </View>
-      <ClubFilter selected={club} setSelected={setClub} />
+      <EventTypeFilter
+        group={filterGroup}
+        setGroup={setFilterGroup}
+        subFilter={subFilter}
+        setSubFilter={setSubFilter}
+      />
       <Text style={styles.resultCount}>{totalEntries} archive entries</Text>
       {entries.length === 0 ? (
         <EmptyState icon="library-outline" title="No Archive Matches" text="Try another event name, club, or year." />
@@ -489,7 +530,6 @@ function CampusHero() {
   return (
     <ImageBackground source={campusImage} style={styles.campusHero} imageStyle={styles.campusHeroImage}>
       <View style={styles.campusOverlay}>
-        <Image source={jaipuriaLogo} style={styles.heroLogo} resizeMode="contain" />
         <Text style={styles.heroTitle}>Jaipuria Indore Campus Connect</Text>
         <Text style={styles.heroSubtitle}>Events, archives, and student achievements in one place.</Text>
       </View>

@@ -256,10 +256,37 @@ async function sendEventPushNotification(store, payload) {
 
 async function notifyEventPublished(store, event) {
   await sendEventPushNotification(store, {
-    body: `${event.name} has been added. Tap to view details.`,
-    data: { eventId: event.id, screen: "EventDetail" },
+    body: `${event.name} by ${event.club} - Tap to view`,
+    data: { screen: "Events" },
     sound: "default",
-    title: "New Event at JIM! 🎉"
+    title: "🎉 New Event Added!"
+  });
+}
+
+async function notifyArchiveAdded(store, entry) {
+  await sendEventPushNotification(store, {
+    body: `${entry.name} has been added to the archive`,
+    data: { screen: "Archive" },
+    sound: "default",
+    title: "📚 New Archive Entry"
+  });
+}
+
+async function notifyWinnerAdded(store, winner) {
+  await sendEventPushNotification(store, {
+    body: `${winner.name} added to Hall of Fame for ${winner.award}`,
+    data: { screen: "HallOfFame" },
+    sound: "default",
+    title: "🏆 New Hall of Fame Winner!"
+  });
+}
+
+async function notifyEventCancelled(store, event) {
+  await sendEventPushNotification(store, {
+    body: `${event.name} has been cancelled`,
+    data: { screen: "Events" },
+    sound: "default",
+    title: "📌 Event Update"
   });
 }
 
@@ -478,6 +505,12 @@ const server = createServer(async (req, res) => {
         if (module === "events" && item.published && !wasPublished) {
           await notifyEventPublished(store, item);
           audit(store, "notify", module, item.id, admin.email ?? admin.name);
+        } else if (module === "archive" && action === "create") {
+          await notifyArchiveAdded(store, item);
+          audit(store, "notify", module, item.id, admin.email ?? admin.name);
+        } else if (module === "winners" && action === "create") {
+          await notifyWinnerAdded(store, item);
+          audit(store, "notify", module, item.id, admin.email ?? admin.name);
         }
         await writeStore(store);
         send(res, 200, item);
@@ -494,8 +527,13 @@ const server = createServer(async (req, res) => {
         send(res, 403, { error: "This role cannot modify this module" });
         return;
       }
+      const deletedItem = store[module].find((entry) => entry.id === id);
       store[module] = store[module].filter((entry) => entry.id !== id);
       audit(store, "delete", module, id, admin.email ?? admin.name);
+      if (module === "events" && deletedItem) {
+        await notifyEventCancelled(store, deletedItem);
+        audit(store, "notify", module, id, admin.email ?? admin.name);
+      }
       await writeStore(store);
       send(res, 200, { ok: true });
       return;

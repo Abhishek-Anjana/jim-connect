@@ -14,9 +14,9 @@ Notifications.setNotificationHandler({
   })
 });
 
-type EventNotificationHandler = (eventId: string) => void;
+type NotificationHandler = (target: { eventId?: string; screen: string }) => void;
 
-export function usePushNotifications(onEventNotification?: EventNotificationHandler) {
+export function usePushNotifications(onNotification?: NotificationHandler) {
   useEffect(() => {
     async function register() {
       if (!config.apiBaseUrl || Platform.OS === "web" || !Device.isDevice) return;
@@ -45,12 +45,15 @@ export function usePushNotifications(onEventNotification?: EventNotificationHand
   useEffect(() => {
     const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
       const data = response.notification.request.content.data;
-      if (data?.screen !== "EventDetail" || typeof data.eventId !== "string") return;
-      onEventNotification?.(data.eventId);
+      if (typeof data?.screen !== "string") return;
+      onNotification?.({
+        eventId: typeof data.eventId === "string" ? data.eventId : undefined,
+        screen: data.screen
+      });
     });
 
     return () => {
       subscription.remove();
     };
-  }, [onEventNotification]);
+  }, [onNotification]);
 }
