@@ -76,10 +76,10 @@ async function handleNoticeRoute({
     store.notices.unshift(notice);
     audit(store, "notice_created", "notices", notice.id, admin.email ?? admin.name);
     await sendPushNotification(store, {
-      body: notice.title,
+      body: notice.message.length > 100 ? `${notice.message.slice(0, 100).trim()}...` : notice.message,
       data: { noticeId: notice.id, screen: "Notices" },
       sound: "default",
-      title: `📢 Notice from ${notice.from_office}`
+      title: `📢 ${notice.from_office}: ${notice.title}`
     });
     await writeStore(store);
     send(res, 200, publicNotice(notice));

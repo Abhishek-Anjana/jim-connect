@@ -3,11 +3,13 @@ import { readFile, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { Expo } from "expo-server-sdk";
 import eventReminderJob from "./jobs/eventReminder.js";
 import noticesRoutes from "./routes/notices.js";
 
 const { startEventReminderJob } = eventReminderJob;
 const { handleNoticeRoute } = noticesRoutes;
+const expo = new Expo();
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const storePath = process.env.STORE_PATH ? resolve(process.env.STORE_PATH) : join(root, "server", "data", "store.json");
@@ -250,30 +252,54 @@ function sanitizeStoreForAdmin(store, admin) {
 
 async function sendEventPushNotification(store, payload) {
   store.pushTokens ??= [];
+  const tokens = store.pushTokens
+    .map((entry) => entry.token)
+    .filter((token) => typeof token === "string" && token.trim().length > 0);
   const notificationRecord = {
     id: `notification-${Date.now()}-${Math.random().toString(16).slice(2)}`,
     payload,
     sentAt: new Date().toISOString(),
     status: "recorded",
-    tokenCount: store.pushTokens.length
+    tokenCount: tokens.length
   };
 
-  const expoTokens = store.pushTokens
-    .filter((entry) => typeof entry.token === "string" && entry.token.startsWith("ExponentPushToken"))
-    .map((entry) => ({ ...payload, to: entry.token }));
+  if (tokens.length === 0) {
+    console.log("No push tokens registered");
+  }
 
-  if (expoTokens.length > 0) {
+  const messages = [];
+  for (const token of tokens) {
+    if (!Expo.isExpoPushToken(token)) {
+      console.error(`Invalid token: ${token}`);
+      continue;
+    }
+    messages.push({
+      body: payload.body,
+      channelId: "default",
+      data: payload.data ?? {},
+      priority: "high",
+      sound: "default",
+      title: payload.title,
+      to: token
+    });
+  }
+
+  const receipts = [];
+  for (const chunk of expo.chunkPushNotifications(messages)) {
     try {
-      await fetch("https://exp.host/--/api/v2/push/send", {
-        body: JSON.stringify(expoTokens),
-        headers: { "Content-Type": "application/json" },
-        method: "POST"
-      });
-      notificationRecord.status = "sent";
-    } catch {
-      notificationRecord.error = "Expo push request failed";
+      const chunkReceipts = await expo.sendPushNotificationsAsync(chunk);
+      console.log("Push sent:", chunkReceipts);
+      receipts.push(...chunkReceipts);
+    } catch (error) {
+      console.error("Push error:", error);
+      notificationRecord.error = error instanceof Error ? error.message : "Expo push request failed";
       notificationRecord.status = "failed";
     }
+  }
+
+  if (messages.length > 0 && notificationRecord.status !== "failed") {
+    notificationRecord.status = "sent";
+    notificationRecord.receipts = receipts;
   }
 
   store.notifications ??= [];
@@ -282,40 +308,41 @@ async function sendEventPushNotification(store, payload) {
   store.lastNotification = notificationRecord;
 }
 
-async function notifyEventPublished(store, event) {
+async function sendPushNotifications(store, title, body, data = {}) {
   await sendEventPushNotification(store, {
-    body: `${event.name} by ${event.club} - Tap to view`,
-    data: { screen: "Events" },
-    sound: "default",
-    title: "🎉 New Event Added!"
+    body,
+    data,
+    title
   });
+}
+
+function firstWords(value, length = 100) {
+  const text = String(value ?? "");
+  return text.length > length ? `${text.slice(0, length).trim()}...` : text;
+}
+
+async function sendDatabaseBackedPushNotifications(title, body, data = {}) {
+  const store = await readStore();
+  await sendPushNotifications(store, title, body, data);
+  await writeStore(store);
+}
+
+export { sendDatabaseBackedPushNotifications };
+
+async function notifyEventPublished(store, event) {
+  await sendPushNotifications(store, `🎉 New Event: ${event.name}`, "Tap to see upcoming events", { screen: "Events" });
 }
 
 async function notifyArchiveAdded(store, entry) {
-  await sendEventPushNotification(store, {
-    body: `${entry.name} has been added to the archive`,
-    data: { screen: "Archive" },
-    sound: "default",
-    title: "📚 New Archive Entry"
-  });
+  await sendPushNotifications(store, `📚 New Archive: ${entry.name}`, "Check the archive section", { screen: "Archive" });
 }
 
 async function notifyWinnerAdded(store, winner) {
-  await sendEventPushNotification(store, {
-    body: `${winner.name} added to Hall of Fame for ${winner.award}`,
-    data: { screen: "HallOfFame" },
-    sound: "default",
-    title: "🏆 New Hall of Fame Winner!"
-  });
+  await sendPushNotifications(store, `🏆 Hall of Fame: ${winner.name}`, "A new winner has been added", { screen: "HallOfFame" });
 }
 
 async function notifyEventCancelled(store, event) {
-  await sendEventPushNotification(store, {
-    body: `${event.name} has been cancelled`,
-    data: { screen: "Events" },
-    sound: "default",
-    title: "📌 Event Update"
-  });
+  await sendPushNotifications(store, `📌 Event Cancelled: ${event.name}`, "An event has been removed", { screen: "Events" });
 }
 
 async function notifyEventReminder(store, event) {
@@ -456,7 +483,34 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    if (req.method === "GET" && path === "/admin/debug/tokens") {
+      const admin = requireAdmin(req, res);
+      if (!admin) return;
+      send(res, 200, store.pushTokens);
+      return;
+    }
+
     const adminEventMatch = path.match(/^\/admin\/events(?:\/([^/]+))?$/);
+    if (adminEventMatch && req.method === "DELETE" && adminEventMatch[1]) {
+      const admin = requireAdmin(req, res);
+      if (!admin) return;
+      if (!canWrite(admin, "events")) {
+        send(res, 403, { error: "This role cannot modify this module" });
+        return;
+      }
+      const id = adminEventMatch[1];
+      const deletedItem = store.events.find((event) => event.id === id);
+      store.events = store.events.filter((event) => event.id !== id);
+      audit(store, "delete", "events", id, admin.email ?? admin.name);
+      if (deletedItem) {
+        await notifyEventCancelled(store, deletedItem);
+        audit(store, "notify", "events", id, admin.email ?? admin.name);
+      }
+      await writeStore(store);
+      send(res, 200, { ok: true });
+      return;
+    }
+
     if (adminEventMatch && (req.method === "POST" || req.method === "PUT")) {
       const admin = requireAdmin(req, res);
       if (!admin) return;
@@ -482,6 +536,35 @@ const server = createServer(async (req, res) => {
         await notifyEventPublished(store, item);
         audit(store, "notify", "events", item.id, admin.email ?? admin.name);
       }
+      await writeStore(store);
+      send(res, 200, item);
+      return;
+    }
+
+    const directAdminContentMatch = path.match(/^\/admin\/(archive|hall-of-fame)$/);
+    if (directAdminContentMatch && req.method === "POST") {
+      const admin = requireAdmin(req, res);
+      if (!admin) return;
+      const module = directAdminContentMatch[1] === "hall-of-fame" ? "winners" : "archive";
+      if (!canWrite(admin, module)) {
+        send(res, 403, { error: "This role cannot modify this module" });
+        return;
+      }
+      const body = await readBody(req);
+      const item =
+        module === "archive"
+          ? normalizeArchiveForStore(body, store.archive.find((entry) => entry.id === body.id))
+          : normalizeWinnerForStore(body, store.winners.find((entry) => entry.id === body.id), store);
+      if (!item.id) item.id = `${module}-${Date.now()}`;
+      const errors = validateAdminItem(module, item, store);
+      if (errors.length > 0) {
+        send(res, 400, { errors });
+        return;
+      }
+      const action = upsert(store[module], item);
+      audit(store, action, module, item.id, admin.email ?? admin.name);
+      if (module === "archive" && action === "create") await notifyArchiveAdded(store, item);
+      if (module === "winners" && action === "create") await notifyWinnerAdded(store, item);
       await writeStore(store);
       send(res, 200, item);
       return;

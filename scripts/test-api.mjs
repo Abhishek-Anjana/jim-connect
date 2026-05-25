@@ -95,6 +95,9 @@ try {
     body: JSON.stringify({ platform: "ios", token: "local-test-token" }),
     method: "POST"
   });
+  const debugTokens = await api("/admin/debug/tokens");
+  assert.equal(debugTokens.length, 1);
+  assert.equal(debugTokens[0].token, "local-test-token");
 
   await api("/admin/api/events", {
     body: JSON.stringify({
@@ -119,8 +122,8 @@ try {
   assert.equal(store.lastNotification.tokenCount, 1);
   assert.equal(store.notifications.length, 1);
   assert.equal(store.notifications[0].payload.data.screen, "Events");
-  assert.equal(store.notifications[0].payload.title, "🎉 New Event Added!");
-  assert.equal(store.notifications[0].payload.body, "API Smoke Event by Student Affairs - Tap to view");
+  assert.equal(store.notifications[0].payload.title, "🎉 New Event: API Smoke Event");
+  assert.equal(store.notifications[0].payload.body, "Tap to see upcoming events");
   assert.ok(store.auditLog.some((entry) => entry.action === "notify" && entry.idRef === "api-smoke-event"));
 
   const updatedEvents = await api("/events/upcoming");
