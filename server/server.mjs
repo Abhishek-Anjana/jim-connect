@@ -89,6 +89,30 @@ function normalizeEventForStore(item, existing = {}) {
   };
 }
 
+function normalizeArchiveForStore(item, existing = {}) {
+  return {
+    ...existing,
+    ...item,
+    image: item.image ?? existing.image ?? "",
+    image_data: item.image_data ?? existing.image_data ?? ""
+  };
+}
+
+function normalizeWinnerForStore(item, existing = {}, store = {}) {
+  const eventName = String(item.eventName ?? existing.eventName ?? "").trim();
+  const linkedArchive = eventName ? (store.archive ?? []).find((entry) => entry.name.toLowerCase() === eventName.toLowerCase()) : null;
+  const category = String(item.category ?? "").trim() || existing.category || item.award || "";
+  return {
+    ...existing,
+    ...item,
+    archiveId: item.archiveId || existing.archiveId || linkedArchive?.id || "",
+    category,
+    eventName: eventName || linkedArchive?.name || existing.eventName || "",
+    portrait: item.portrait ?? existing.portrait ?? "",
+    image_data: item.image_data ?? existing.image_data ?? ""
+  };
+}
+
 function requireAdmin(req, res) {
   const store = req.store;
   const token = req.headers["x-admin-token"];
@@ -177,9 +201,11 @@ function validateAdminItem(module, item, store) {
   }
 
   if (module === "archive") {
-    for (const field of ["eventId", "name", "date", "club", "year", "image", "summary", "driveUrl"]) {
+    item = normalizeArchiveForStore(item, store.archive?.find((entry) => entry.id === item.id));
+    for (const field of ["eventId", "name", "date", "club", "year", "summary", "driveUrl"]) {
       requireString(item, field, errors);
     }
+    if (!item.image_data && !item.image) errors.push("image upload is required");
     if (item.date && Number.isNaN(Date.parse(item.date))) errors.push("date must be valid");
     if (item.image && !isHttpsUrl(item.image)) errors.push("image must be an HTTPS URL");
     if (item.driveUrl && !isGoogleDriveUrl(item.driveUrl)) errors.push("driveUrl must be an HTTPS Google Drive URL");
@@ -187,9 +213,11 @@ function validateAdminItem(module, item, store) {
   }
 
   if (module === "winners") {
-    for (const field of ["name", "batch", "award", "category", "club", "eventName", "archiveId", "portrait"]) {
+    item = normalizeWinnerForStore(item, store.winners?.find((entry) => entry.id === item.id), store);
+    for (const field of ["name", "batch", "award", "club", "eventName", "archiveId"]) {
       requireString(item, field, errors);
     }
+    if (!item.image_data && !item.portrait) errors.push("portrait photo is required");
     if (item.portrait && !isHttpsUrl(item.portrait)) errors.push("portrait must be an HTTPS URL");
     if (typeof item.champion !== "boolean") errors.push("champion must be true or false");
     const archive = store.archive.find((entry) => entry.id === item.archiveId);
@@ -404,12 +432,12 @@ const server = createServer(async (req, res) => {
     }
 
     if (req.method === "GET" && path === "/archive") {
-      send(res, 200, store.archive.sort((a, b) => new Date(b.date) - new Date(a.date)));
+      send(res, 200, store.archive.sort((a, b) => new Date(b.date) - new Date(a.date)).map((entry) => ({ ...entry, image_data: entry.image_data ?? "" })));
       return;
     }
 
     if (req.method === "GET" && path === "/hall-of-fame") {
-      send(res, 200, store.winners);
+      send(res, 200, store.winners.map((winner) => ({ ...winner, image_data: winner.image_data ?? "" })));
       return;
     }
 
@@ -489,7 +517,14 @@ const server = createServer(async (req, res) => {
       }
       if (req.method === "POST" || req.method === "PUT") {
         const body = await readBody(req);
-        const item = module === "events" ? normalizeEventForStore(body, store.events.find((event) => event.id === body.id)) : body;
+        const item =
+          module === "events"
+            ? normalizeEventForStore(body, store.events.find((event) => event.id === body.id))
+            : module === "archive"
+              ? normalizeArchiveForStore(body, store.archive.find((entry) => entry.id === body.id))
+              : module === "winners"
+                ? normalizeWinnerForStore(body, store.winners.find((entry) => entry.id === body.id), store)
+                : body;
         if (!item.id) item.id = `${module}-${Date.now()}`;
         const errors = validateAdminItem(module, item, store);
         if (errors.length > 0) {

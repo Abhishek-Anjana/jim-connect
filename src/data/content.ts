@@ -23,6 +23,7 @@ export type ArchiveEntry = {
   club: Exclude<Club, "All">;
   year: string;
   image: string;
+  image_data?: string;
   summary: string;
   driveUrl: string;
 };
@@ -37,6 +38,7 @@ export type Winner = {
   eventName: string;
   archiveId: string;
   portrait: string;
+  image_data?: string;
   champion: boolean;
 };
 

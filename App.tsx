@@ -556,6 +556,14 @@ function eventImageUri(event: Event) {
   return event.image_data ? `data:image/jpeg;base64,${event.image_data}` : event.image;
 }
 
+function archiveImageUri(entry: ArchiveEntry) {
+  return entry.image_data ? `data:image/jpeg;base64,${entry.image_data}` : entry.image;
+}
+
+function winnerImageUri(winner: Winner) {
+  return winner.image_data ? `data:image/jpeg;base64,${winner.image_data}` : winner.portrait;
+}
+
 function DetailScreen({ detail }: { detail: Detail }) {
   const [driveError, setDriveError] = useState<string | null>(null);
   const [registerError, setRegisterError] = useState<string | null>(null);
@@ -628,7 +636,7 @@ function DetailScreen({ detail }: { detail: Detail }) {
         fallbackIcon={<Ionicons name="image-outline" size={32} color={palette.green} />}
         fallbackText={entry.name}
         style={styles.detailImage}
-        uri={entry.image}
+        uri={archiveImageUri(entry)}
       />
       <Text style={styles.detailTitle}>{entry.name}</Text>
       <Meta icon="calendar-outline" text={formatDate(entry.date)} />
@@ -695,7 +703,7 @@ function ArchiveCard({ entry, onPress }: { entry: ArchiveEntry; onPress: () => v
         fallbackIcon={<Ionicons name="library-outline" size={24} color={palette.green} />}
         fallbackText={entry.name}
         style={styles.archiveThumb}
-        uri={entry.image}
+        uri={archiveImageUri(entry)}
       />
       <View style={styles.archiveText}>
         <Text style={styles.cardTitle}>{entry.name}</Text>
@@ -722,7 +730,7 @@ function WinnerCard({
         fallbackIcon={<Ionicons name="person-outline" size={28} color={palette.green} />}
         fallbackText={winner.name}
         style={styles.portrait}
-        uri={winner.portrait}
+        uri={winnerImageUri(winner)}
       />
       <Text style={styles.winnerName}>{winner.name}</Text>
       <Text style={styles.winnerMeta}>{winner.batch}</Text>

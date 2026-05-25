@@ -7,7 +7,7 @@
 body {
   background:
     linear-gradient(rgba(247, 243, 236, 0.88), rgba(247, 243, 236, 0.95)),
-    url("/admin/jaipuria-campus.jpg") center top / cover fixed;
+    url("./jaipuria-campus.jpg") center top / cover fixed;
   margin: 0;
 }
 
@@ -44,7 +44,7 @@ header {
 .hero {
   background:
     linear-gradient(90deg, rgba(32, 33, 36, 0.72), rgba(32, 33, 36, 0.2)),
-    url("/admin/jaipuria-campus.jpg") center / cover;
+    url("./jaipuria-campus.jpg") center / cover;
   border-radius: 8px;
   color: white;
   margin-bottom: 18px;
@@ -104,6 +104,18 @@ textarea {
   min-height: 42px;
   padding: 9px 11px;
   width: 100%;
+}
+
+input.invalid,
+select.invalid,
+textarea.invalid {
+  border-color: #9d2832;
+}
+
+.field-error {
+  color: #9d2832;
+  font-size: 12px;
+  font-weight: 800;
 }
 
 textarea {
@@ -233,6 +245,35 @@ button.danger {
   border-radius: 8px;
   object-fit: cover;
   width: 100%;
+}
+
+.portrait-preview {
+  aspect-ratio: 1;
+  border-radius: 50%;
+  height: 112px;
+  justify-self: start;
+  width: 112px;
+}
+
+#notice-form {
+  border-width: 2px;
+}
+
+#notice-form.priority-normal {
+  border-color: #2d74c4;
+}
+
+#notice-form.priority-important {
+  border-color: #c96d1d;
+}
+
+#notice-form.priority-urgent {
+  border-color: #9d2832;
+}
+
+#notice-preview {
+  display: grid;
+  gap: 8px;
 }
 
 .notice-card {

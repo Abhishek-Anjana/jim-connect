@@ -89,14 +89,13 @@ export function isValidArchiveEntry(value: unknown): value is ArchiveEntry {
     hasString(value, "date") &&
     hasString(value, "club") &&
     hasString(value, "year") &&
-    hasString(value, "image") &&
     hasString(value, "summary") &&
     hasString(value, "driveUrl") &&
     typeof summary === "string" &&
     typeof date === "string" &&
     typeof driveUrl === "string" &&
-    typeof value.image === "string" &&
-    isHttpsUrl(value.image) &&
+    ((typeof value.image === "string" && isHttpsUrl(value.image)) ||
+      (typeof value.image_data === "string" && value.image_data.trim().length > 0)) &&
     summary.trim().split(/\s+/).length >= 100 &&
     !Number.isNaN(Date.parse(date)) &&
     isGoogleDriveUrl(driveUrl)
@@ -114,9 +113,8 @@ export function isValidWinner(value: unknown): value is Winner {
     hasString(value, "club") &&
     hasString(value, "eventName") &&
     hasString(value, "archiveId") &&
-    hasString(value, "portrait") &&
-    typeof value.portrait === "string" &&
-    isHttpsUrl(value.portrait) &&
+    ((typeof value.portrait === "string" && isHttpsUrl(value.portrait)) ||
+      (typeof value.image_data === "string" && value.image_data.trim().length > 0)) &&
     typeof value.champion === "boolean"
   );
 }

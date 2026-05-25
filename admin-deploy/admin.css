@@ -106,6 +106,18 @@ textarea {
   width: 100%;
 }
 
+input.invalid,
+select.invalid,
+textarea.invalid {
+  border-color: #9d2832;
+}
+
+.field-error {
+  color: #9d2832;
+  font-size: 12px;
+  font-weight: 800;
+}
+
 textarea {
   min-height: 96px;
   resize: vertical;
@@ -233,6 +245,35 @@ button.danger {
   border-radius: 8px;
   object-fit: cover;
   width: 100%;
+}
+
+.portrait-preview {
+  aspect-ratio: 1;
+  border-radius: 50%;
+  height: 112px;
+  justify-self: start;
+  width: 112px;
+}
+
+#notice-form {
+  border-width: 2px;
+}
+
+#notice-form.priority-normal {
+  border-color: #2d74c4;
+}
+
+#notice-form.priority-important {
+  border-color: #c96d1d;
+}
+
+#notice-form.priority-urgent {
+  border-color: #9d2832;
+}
+
+#notice-preview {
+  display: grid;
+  gap: 8px;
 }
 
 .notice-card {

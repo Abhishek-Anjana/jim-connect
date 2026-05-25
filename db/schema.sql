@@ -30,6 +30,7 @@ create table if not exists archive (
   club text not null,
   year text not null,
   image text not null,
+  image_data text,
   summary text not null,
   drive_url text not null,
   created_at timestamptz not null default now(),
@@ -46,6 +47,7 @@ create table if not exists hall_of_fame (
   event_name text not null,
   archive_id text not null references archive(id) on delete restrict,
   portrait text not null,
+  image_data text,
   champion boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
