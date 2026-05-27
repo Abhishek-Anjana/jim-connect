@@ -232,7 +232,6 @@ export default function App() {
           )}
         </View>
         {!detail && !showNotices && error ? <Text style={styles.offlineBanner}>{error}</Text> : null}
-        {!detail && !showNotices && lastUpdated ? <Text style={styles.updatedBanner}>Updated {formatDateTime(lastUpdated)}</Text> : null}
 
         <Modal animationType="slide" visible={showNotices} onRequestClose={() => setShowNotices(false)}>
           <SafeAreaView style={styles.safe}>
@@ -272,6 +271,7 @@ export default function App() {
                   subFilter={eventSubFilter}
                   setSubFilter={setEventSubFilter}
                   events={visibleEvents}
+                  lastUpdated={lastUpdated}
                   loading={loading}
                   openEvent={(event) => setDetail({ type: "event", item: event })}
                 />
@@ -290,6 +290,7 @@ export default function App() {
                   query={archiveQuery}
                   setQuery={setArchiveQuery}
                   entries={visibleArchive.slice(0, archivePage * 20)}
+                  lastUpdated={lastUpdated}
                   totalEntries={visibleArchive.length}
                   canLoadMore={visibleArchive.length > archivePage * 20}
                   loadMore={() => setArchivePage((page) => page + 1)}
@@ -310,6 +311,7 @@ export default function App() {
                   setSubFilter={setFameSubFilter}
                   winnerBatch={winnerBatch}
                   setWinnerBatch={setWinnerBatch}
+                  lastUpdated={lastUpdated}
                   winners={visibleWinners}
                   openArchive={openArchiveFromWinner}
                 />
@@ -329,6 +331,7 @@ function EventsScreen({
   subFilter,
   setSubFilter,
   events,
+  lastUpdated,
   loading,
   openEvent
 }: {
@@ -337,13 +340,14 @@ function EventsScreen({
   subFilter: string | null;
   setSubFilter: (filter: string) => void;
   events: Event[];
+  lastUpdated: string | null;
   loading: boolean;
   openEvent: (event: Event) => void;
 }) {
   return (
     <View>
       <CampusHero />
-      <SectionHeading title="Upcoming Events" subtitle="Nearest campus opportunities first" />
+      <SectionHeading title="Upcoming Events" subtitle="Nearest campus opportunities first" lastUpdated={lastUpdated} />
       <EventTypeFilter
         group={filterGroup}
         setGroup={setFilterGroup}
@@ -426,6 +430,7 @@ function ArchiveScreen({
   query,
   setQuery,
   entries,
+  lastUpdated,
   totalEntries,
   canLoadMore,
   loadMore,
@@ -440,6 +445,7 @@ function ArchiveScreen({
   query: string;
   setQuery: (query: string) => void;
   entries: ArchiveEntry[];
+  lastUpdated: string | null;
   totalEntries: number;
   canLoadMore: boolean;
   loadMore: () => void;
@@ -447,7 +453,7 @@ function ArchiveScreen({
 }) {
   return (
     <View>
-      <SectionHeading title="Archive" subtitle="Campus memory, write-ups, and photo links" />
+      <SectionHeading title="Archive" subtitle="Campus memory, write-ups, and photo links" lastUpdated={lastUpdated} />
       <View style={styles.searchBox}>
         <Ionicons name="search" size={18} color={palette.muted} />
         <TextInput
@@ -491,6 +497,7 @@ function HallOfFameScreen({
   setSubFilter,
   winnerBatch,
   setWinnerBatch,
+  lastUpdated,
   winners: visibleWinners,
   openArchive
 }: {
@@ -503,13 +510,14 @@ function HallOfFameScreen({
   setSubFilter: (filter: string) => void;
   winnerBatch: string;
   setWinnerBatch: (batch: string) => void;
+  lastUpdated: string | null;
   winners: Winner[];
   openArchive: (winner: Winner) => void;
 }) {
   const champions = visibleWinners.filter((winner) => winner.champion);
   return (
     <View>
-      <SectionHeading title="Hall of Fame" subtitle="A permanent record of student excellence" />
+      <SectionHeading title="Hall of Fame" subtitle="A permanent record of student excellence" lastUpdated={lastUpdated} />
       {champions.length > 0 ? (
         <View style={styles.highlight}>
           <Text style={styles.highlightLabel}>Champions of the Year</Text>
@@ -744,11 +752,12 @@ function WinnerCard({
   );
 }
 
-function SectionHeading({ title, subtitle }: { title: string; subtitle: string }) {
+function SectionHeading({ title, subtitle, lastUpdated }: { title: string; subtitle: string; lastUpdated?: string | null }) {
   return (
     <View style={styles.sectionHeading}>
       <Text style={styles.screenTitle}>{title}</Text>
       <Text style={styles.screenSubtitle}>{subtitle}</Text>
+      {lastUpdated ? <Text style={styles.lastUpdatedText}>Last updated: {formatDateTime(lastUpdated)}</Text> : null}
     </View>
   );
 }
@@ -886,13 +895,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 8
   },
-  updatedBanner: {
-    color: palette.muted,
-    fontSize: 12,
-    fontWeight: "700",
-    paddingHorizontal: 18,
-    paddingTop: 8
-  },
   kicker: {
     color: palette.muted,
     fontSize: 12,
@@ -979,6 +981,12 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 22,
     marginTop: 4
+  },
+  lastUpdatedText: {
+    color: palette.green,
+    fontSize: 12,
+    fontWeight: "800",
+    marginTop: 6
   },
   filterLabel: {
     color: palette.ink,

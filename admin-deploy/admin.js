@@ -48,7 +48,8 @@ const requiredFields = {
   winners: ["name", "batch", "award", "club"]
 };
 
-const apiBaseUrl = ["localhost", "127.0.0.1"].includes(location.hostname) ? "" : "https://jim-connect-production.up.railway.app";
+const API_BASE_URL = "https://jim-connect-production.up.railway.app";
+const apiBaseUrl = API_BASE_URL;
 let active = "dashboard";
 let store = null;
 const content = document.querySelector("#content");

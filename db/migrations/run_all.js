@@ -40,6 +40,8 @@ try {
     alter table events add column if not exists registration_link text;
     alter table events add column if not exists image_data text;
     alter table events add column if not exists reminder_sent boolean default false;
+    alter table archive add column if not exists image_data text;
+    alter table hall_of_fame add column if not exists image_data text;
 
     create table if not exists notices (
       id serial primary key,

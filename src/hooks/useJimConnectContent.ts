@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { AppState } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ArchiveEntry, Event, Notice, Winner, archiveEntries, notices, upcomingEvents, winners } from "../data/content";
 import { getArchiveEntries, getNotices, getUpcomingEvents, getWinners } from "../services/jimConnectApi";
@@ -125,6 +126,16 @@ export function useJimConnectContent() {
 
     void boot();
   }, [hydrateCache, load]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") {
+        void load(true);
+      }
+    });
+
+    return () => subscription.remove();
+  }, [load]);
 
   return {
     archive,

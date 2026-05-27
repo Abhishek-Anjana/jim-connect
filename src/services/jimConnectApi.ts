@@ -15,9 +15,15 @@ async function fetchJson<T>(path: string, fallback: T): Promise<T> {
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), config.apiTimeoutMs);
+  const separator = path.includes("?") ? "&" : "?";
+  const url = `${config.apiBaseUrl}${path}${separator}_=${Date.now()}`;
 
   try {
-    const response = await fetch(`${config.apiBaseUrl}${path}`, {
+    const response = await fetch(url, {
+      headers: {
+        "Cache-Control": "no-cache",
+        Pragma: "no-cache"
+      },
       signal: controller.signal
     });
     if (!response.ok) {

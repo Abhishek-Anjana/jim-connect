@@ -4,11 +4,13 @@ import { existsSync } from "node:fs";
 import { dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Expo } from "expo-server-sdk";
+import pg from "pg";
 import eventReminderJob from "./jobs/eventReminder.js";
 import noticesRoutes from "./routes/notices.js";
 
 const { startEventReminderJob } = eventReminderJob;
 const { handleNoticeRoute } = noticesRoutes;
+const { Pool } = pg;
 const expo = new Expo();
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -16,7 +18,33 @@ const storePath = process.env.STORE_PATH ? resolve(process.env.STORE_PATH) : joi
 const publicDir = join(root, "server", "public");
 const webDir = join(root, "dist-web");
 const port = Number(process.env.PORT ?? 3001);
+
+async function loadEnvFileIfPresent() {
+  const envPath = join(root, ".env");
+  if (!existsSync(envPath)) return;
+  const lines = (await readFile(envPath, "utf8")).split(/\r?\n/);
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const separator = trimmed.indexOf("=");
+    if (separator === -1) continue;
+    const key = trimmed.slice(0, separator).trim();
+    const value = trimmed.slice(separator + 1).trim().replace(/^["']|["']$/g, "");
+    if (key && process.env[key] === undefined) process.env[key] = value;
+  }
+}
+
+await loadEnvFileIfPresent();
+
 const adminToken = process.env.ADMIN_TOKEN ?? "jim-admin-dev";
+const databaseUrl = process.env.DATABASE_URL;
+const useDatabase = Boolean(databaseUrl && !process.env.STORE_PATH);
+const pool = useDatabase
+  ? new Pool({
+      connectionString: databaseUrl,
+      ssl: databaseUrl.includes("supabase.co") ? { rejectUnauthorized: false } : undefined
+    })
+  : null;
 const defaultAdmin = {
   active: true,
   email: "rekha.attri@jaipuria.ac.in",
@@ -49,7 +77,10 @@ function send(res, status, body, type = "application/json; charset=utf-8") {
     "Access-Control-Allow-Headers": "Content-Type, X-Admin-Token",
     "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
     "Access-Control-Allow-Origin": "*",
-    "Content-Type": type
+    "Cache-Control": "no-store, no-cache, must-revalidate, private",
+    "Content-Type": type,
+    "Expires": "0",
+    "Pragma": "no-cache"
   });
   res.end(typeof body === "string" || Buffer.isBuffer(body) ? body : JSON.stringify(body));
 }
@@ -60,6 +91,229 @@ async function readStore() {
 
 async function writeStore(store) {
   await writeFile(storePath, `${JSON.stringify(store, null, 2)}\n`);
+}
+
+function toIso(value) {
+  return value instanceof Date ? value.toISOString() : value;
+}
+
+function rowToEvent(row) {
+  return {
+    attachments: Array.isArray(row.attachments) ? row.attachments : [],
+    club: row.club,
+    description: row.description,
+    endsAt: toIso(row.ends_at),
+    id: row.id,
+    image: row.image ?? "",
+    image_data: row.image_data ?? "",
+    name: row.name,
+    published: Boolean(row.published),
+    registration_link: row.registration_link ?? "",
+    reminder_sent: Boolean(row.reminder_sent),
+    reminderSent: Boolean(row.reminder_sent),
+    speakers: Array.isArray(row.speakers) ? row.speakers : [],
+    startsAt: toIso(row.starts_at),
+    venue: row.venue
+  };
+}
+
+function rowToArchive(row) {
+  return {
+    club: row.club,
+    date: toIso(row.date),
+    driveUrl: row.drive_url,
+    eventId: row.event_id,
+    id: row.id,
+    image: row.image ?? "",
+    image_data: row.image_data ?? "",
+    name: row.name,
+    summary: row.summary,
+    year: row.year
+  };
+}
+
+function rowToWinner(row) {
+  return {
+    archiveId: row.archive_id,
+    award: row.award,
+    batch: row.batch,
+    category: row.category,
+    champion: Boolean(row.champion),
+    club: row.club,
+    eventName: row.event_name,
+    id: row.id,
+    image_data: row.image_data ?? "",
+    name: row.name,
+    portrait: row.portrait ?? ""
+  };
+}
+
+function rowToNotice(row) {
+  return {
+    created_at: toIso(row.created_at),
+    from_office: row.from_office,
+    id: String(row.id),
+    is_active: row.is_active !== false,
+    message: row.message,
+    priority: row.priority,
+    title: row.title
+  };
+}
+
+async function queryDatabase(sql, params = []) {
+  if (!pool) throw new Error("DATABASE_URL is not configured");
+  return pool.query(sql, params);
+}
+
+async function getDatabaseContent() {
+  const [events, archive, winners, notices] = await Promise.all([
+    queryDatabase("select * from events order by starts_at asc"),
+    queryDatabase("select * from archive order by date desc, created_at desc"),
+    queryDatabase("select * from hall_of_fame order by created_at desc"),
+    queryDatabase("select id, title, message, from_office, priority, created_at, is_active from notices order by created_at desc")
+  ]);
+
+  return {
+    archive: archive.rows.map(rowToArchive),
+    events: events.rows.map(rowToEvent),
+    notices: notices.rows.map(rowToNotice),
+    winners: winners.rows.map(rowToWinner)
+  };
+}
+
+async function hydrateStoreFromDatabase(store) {
+  if (!useDatabase) return store;
+  const content = await getDatabaseContent();
+  store.archive = content.archive;
+  store.events = content.events;
+  store.notices = content.notices;
+  store.winners = content.winners;
+  return store;
+}
+
+async function upsertDatabaseEvent(item) {
+  const result = await queryDatabase(
+    `insert into events (
+      id, name, starts_at, ends_at, venue, club, image, image_data, registration_link,
+      description, speakers, attachments, published, reminder_sent, updated_at
+    ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, $12::jsonb, $13, $14, now())
+    on conflict (id) do update set
+      name = excluded.name,
+      starts_at = excluded.starts_at,
+      ends_at = excluded.ends_at,
+      venue = excluded.venue,
+      club = excluded.club,
+      image = excluded.image,
+      image_data = excluded.image_data,
+      registration_link = excluded.registration_link,
+      description = excluded.description,
+      speakers = excluded.speakers,
+      attachments = excluded.attachments,
+      published = excluded.published,
+      reminder_sent = excluded.reminder_sent,
+      updated_at = now()
+    returning *`,
+    [
+      item.id,
+      item.name,
+      item.startsAt,
+      item.endsAt,
+      item.venue,
+      item.club,
+      item.image ?? "",
+      item.image_data ?? "",
+      item.registration_link ?? "",
+      item.description,
+      JSON.stringify(item.speakers ?? []),
+      JSON.stringify(item.attachments ?? []),
+      Boolean(item.published),
+      Boolean(item.reminder_sent ?? item.reminderSent)
+    ]
+  );
+  return rowToEvent(result.rows[0]);
+}
+
+async function upsertDatabaseArchive(item) {
+  const result = await queryDatabase(
+    `insert into archive (
+      id, event_id, name, date, club, year, image, image_data, summary, drive_url, updated_at
+    ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, now())
+    on conflict (id) do update set
+      event_id = excluded.event_id,
+      name = excluded.name,
+      date = excluded.date,
+      club = excluded.club,
+      year = excluded.year,
+      image = excluded.image,
+      image_data = excluded.image_data,
+      summary = excluded.summary,
+      drive_url = excluded.drive_url,
+      updated_at = now()
+    returning *`,
+    [
+      item.id,
+      item.eventId,
+      item.name,
+      item.date,
+      item.club,
+      item.year,
+      item.image ?? "",
+      item.image_data ?? "",
+      item.summary,
+      item.driveUrl
+    ]
+  );
+  return rowToArchive(result.rows[0]);
+}
+
+async function upsertDatabaseWinner(item) {
+  const result = await queryDatabase(
+    `insert into hall_of_fame (
+      id, name, batch, award, category, club, event_name, archive_id, portrait, image_data, champion, updated_at
+    ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, now())
+    on conflict (id) do update set
+      name = excluded.name,
+      batch = excluded.batch,
+      award = excluded.award,
+      category = excluded.category,
+      club = excluded.club,
+      event_name = excluded.event_name,
+      archive_id = excluded.archive_id,
+      portrait = excluded.portrait,
+      image_data = excluded.image_data,
+      champion = excluded.champion,
+      updated_at = now()
+    returning *`,
+    [
+      item.id,
+      item.name,
+      item.batch,
+      item.award,
+      item.category,
+      item.club,
+      item.eventName,
+      item.archiveId,
+      item.portrait ?? "",
+      item.image_data ?? "",
+      Boolean(item.champion)
+    ]
+  );
+  return rowToWinner(result.rows[0]);
+}
+
+async function getDatabasePushTokens() {
+  if (!useDatabase) return [];
+  const result = await queryDatabase("select platform, token, updated_at from push_tokens where token is not null order by updated_at desc");
+  return result.rows.map((row) => ({ platform: row.platform, token: row.token, updatedAt: toIso(row.updated_at) }));
+}
+
+async function auditDatabase(action, module, id, user = "admin") {
+  if (!useDatabase) return;
+  await queryDatabase(
+    `insert into audit_log (id, action, id_ref, module, "user")
+     values ($1, $2, $3, $4, $5)`,
+    [`audit-${Date.now()}-${Math.random().toString(16).slice(2)}`, action, id, module, user]
+  );
 }
 
 async function readBody(req) {
@@ -252,7 +506,8 @@ function sanitizeStoreForAdmin(store, admin) {
 
 async function sendEventPushNotification(store, payload) {
   store.pushTokens ??= [];
-  const tokens = store.pushTokens
+  const tokenEntries = useDatabase ? await getDatabasePushTokens() : store.pushTokens;
+  const tokens = tokenEntries
     .map((entry) => entry.token)
     .filter((token) => typeof token === "string" && token.trim().length > 0);
   const notificationRecord = {
@@ -306,6 +561,21 @@ async function sendEventPushNotification(store, payload) {
   store.notifications.unshift(notificationRecord);
   store.notifications = store.notifications.slice(0, 100);
   store.lastNotification = notificationRecord;
+  if (useDatabase) {
+    await queryDatabase(
+      `insert into notifications (id, payload, sent_at, status, token_count, error)
+       values ($1, $2::jsonb, $3, $4, $5, $6)
+       on conflict (id) do nothing`,
+      [
+        notificationRecord.id,
+        JSON.stringify(payload),
+        notificationRecord.sentAt,
+        notificationRecord.status,
+        notificationRecord.tokenCount,
+        notificationRecord.error ?? null
+      ]
+    );
+  }
 }
 
 async function sendPushNotifications(store, title, body, data = {}) {
@@ -425,7 +695,86 @@ const server = createServer(async (req, res) => {
     store.notifications ??= [];
     store.auditLog ??= [];
     store.notices ??= [];
+    await hydrateStoreFromDatabase(store);
     req.store = store;
+
+    if (useDatabase && req.method === "GET" && path === "/notices") {
+      const result = await queryDatabase(
+        "select id, title, message, from_office, priority, created_at, is_active from notices where is_active = true order by created_at desc"
+      );
+      send(res, 200, result.rows.map(rowToNotice));
+      return;
+    }
+
+    if (useDatabase && path === "/admin/notices" && req.method === "POST") {
+      const admin = requireAdmin(req, res);
+      if (!admin) return;
+      if (!canWrite(admin, "notices")) {
+        send(res, 403, { error: "This role cannot modify this module" });
+        return;
+      }
+      const body = await readBody(req);
+      const priority = body.priority || "Normal";
+      const item = {
+        from_office: body.from_office,
+        message: body.message,
+        priority,
+        title: body.title
+      };
+      const errors = validateAdminItem("notices", { ...item, id: "notice-preview" }, store);
+      if (errors.length > 0) {
+        send(res, 400, { errors });
+        return;
+      }
+      const result = await queryDatabase(
+        `insert into notices (title, message, from_office, priority, is_active)
+         values ($1, $2, $3, $4, true)
+         returning id, title, message, from_office, priority, created_at, is_active`,
+        [item.title, item.message, item.from_office, item.priority]
+      );
+      const notice = rowToNotice(result.rows[0]);
+      store.notices.unshift(notice);
+      audit(store, "notice_created", "notices", notice.id, admin.email ?? admin.name);
+      await auditDatabase("notice_created", "notices", notice.id, admin.email ?? admin.name);
+      await sendPushNotifications(store, `📢 ${notice.from_office}: ${notice.title}`, firstWords(notice.message), { screen: "Notices" });
+      await writeStore(store);
+      send(res, 201, notice);
+      return;
+    }
+
+    const databaseNoticeIdMatch = path.match(/^\/admin\/notices\/([^/]+)$/);
+    if (useDatabase && databaseNoticeIdMatch && (req.method === "DELETE" || req.method === "PATCH")) {
+      const admin = requireAdmin(req, res);
+      if (!admin) return;
+      if (!canWrite(admin, "notices")) {
+        send(res, 403, { error: "This role cannot modify this module" });
+        return;
+      }
+      const id = databaseNoticeIdMatch[1];
+      const result =
+        req.method === "DELETE"
+          ? await queryDatabase(
+              `update notices set is_active = false where id = $1
+               returning id, title, message, from_office, priority, created_at, is_active`,
+              [id]
+            )
+          : await queryDatabase(
+              `update notices set is_active = not is_active where id = $1
+               returning id, title, message, from_office, priority, created_at, is_active`,
+              [id]
+            );
+      if (result.rowCount === 0) {
+        send(res, 404, { error: "Notice not found" });
+        return;
+      }
+      const notice = rowToNotice(result.rows[0]);
+      const action = req.method === "DELETE" ? "notice_deleted" : "notice_updated";
+      audit(store, action, "notices", id, admin.email ?? admin.name);
+      await auditDatabase(action, "notices", id, admin.email ?? admin.name);
+      await writeStore(store);
+      send(res, 200, req.method === "DELETE" ? { ok: true } : notice);
+      return;
+    }
 
     if (
       await handleNoticeRoute({
@@ -478,6 +827,16 @@ const server = createServer(async (req, res) => {
       const index = store.pushTokens.findIndex((entry) => entry.token === next.token);
       if (index >= 0) store.pushTokens[index] = next;
       else store.pushTokens.push(next);
+      if (useDatabase) {
+        await queryDatabase(
+          `insert into push_tokens (platform, token, updated_at)
+           values ($1, $2, now())
+           on conflict (token) do update set
+             platform = excluded.platform,
+             updated_at = now()`,
+          [next.platform, next.token]
+        );
+      }
       await writeStore(store);
       send(res, 200, { ok: true });
       return;
@@ -486,7 +845,7 @@ const server = createServer(async (req, res) => {
     if (req.method === "GET" && path === "/admin/debug/tokens") {
       const admin = requireAdmin(req, res);
       if (!admin) return;
-      send(res, 200, store.pushTokens);
+      send(res, 200, useDatabase ? await getDatabasePushTokens() : store.pushTokens);
       return;
     }
 
@@ -501,10 +860,15 @@ const server = createServer(async (req, res) => {
       const id = adminEventMatch[1];
       const deletedItem = store.events.find((event) => event.id === id);
       store.events = store.events.filter((event) => event.id !== id);
+      if (useDatabase) {
+        await queryDatabase("delete from events where id = $1", [id]);
+      }
       audit(store, "delete", "events", id, admin.email ?? admin.name);
+      await auditDatabase("delete", "events", id, admin.email ?? admin.name);
       if (deletedItem) {
         await notifyEventCancelled(store, deletedItem);
         audit(store, "notify", "events", id, admin.email ?? admin.name);
+        await auditDatabase("notify", "events", id, admin.email ?? admin.name);
       }
       await writeStore(store);
       send(res, 200, { ok: true });
@@ -532,12 +896,15 @@ const server = createServer(async (req, res) => {
       const wasPublished = Boolean(existing?.published);
       const action = upsert(store.events, item);
       audit(store, action, "events", item.id, admin.email ?? admin.name);
+      const savedItem = useDatabase ? await upsertDatabaseEvent(item) : item;
+      await auditDatabase(action, "events", item.id, admin.email ?? admin.name);
       if (item.published && !wasPublished) {
         await notifyEventPublished(store, item);
         audit(store, "notify", "events", item.id, admin.email ?? admin.name);
+        await auditDatabase("notify", "events", item.id, admin.email ?? admin.name);
       }
       await writeStore(store);
-      send(res, 200, item);
+      send(res, 200, savedItem);
       return;
     }
 
@@ -563,10 +930,25 @@ const server = createServer(async (req, res) => {
       }
       const action = upsert(store[module], item);
       audit(store, action, module, item.id, admin.email ?? admin.name);
-      if (module === "archive" && action === "create") await notifyArchiveAdded(store, item);
-      if (module === "winners" && action === "create") await notifyWinnerAdded(store, item);
+      const savedItem =
+        useDatabase && module === "archive"
+          ? await upsertDatabaseArchive(item)
+          : useDatabase && module === "winners"
+            ? await upsertDatabaseWinner(item)
+            : item;
+      await auditDatabase(action, module, item.id, admin.email ?? admin.name);
+      if (module === "archive" && action === "create") {
+        await notifyArchiveAdded(store, item);
+        audit(store, "notify", module, item.id, admin.email ?? admin.name);
+        await auditDatabase("notify", module, item.id, admin.email ?? admin.name);
+      }
+      if (module === "winners" && action === "create") {
+        await notifyWinnerAdded(store, item);
+        audit(store, "notify", module, item.id, admin.email ?? admin.name);
+        await auditDatabase("notify", module, item.id, admin.email ?? admin.name);
+      }
       await writeStore(store);
-      send(res, 200, item);
+      send(res, 200, savedItem);
       return;
     }
 
@@ -617,21 +999,34 @@ const server = createServer(async (req, res) => {
         const wasPublished = module === "events" && store.events.find((event) => event.id === item.id)?.published;
         if (module === "events" && item.reminderSent === undefined) {
           item.reminderSent = store.events.find((event) => event.id === item.id)?.reminderSent ?? false;
+          item.reminder_sent = item.reminderSent;
         }
         const action = upsert(store[storeKey], item);
         audit(store, action, module, item.id, admin.email ?? admin.name);
+        const savedItem =
+          useDatabase && module === "events"
+            ? await upsertDatabaseEvent(item)
+            : useDatabase && module === "archive"
+              ? await upsertDatabaseArchive(item)
+              : useDatabase && module === "winners"
+                ? await upsertDatabaseWinner(item)
+                : item;
+        await auditDatabase(action, module, item.id, admin.email ?? admin.name);
         if (module === "events" && item.published && !wasPublished) {
           await notifyEventPublished(store, item);
           audit(store, "notify", module, item.id, admin.email ?? admin.name);
+          await auditDatabase("notify", module, item.id, admin.email ?? admin.name);
         } else if (module === "archive" && action === "create") {
           await notifyArchiveAdded(store, item);
           audit(store, "notify", module, item.id, admin.email ?? admin.name);
+          await auditDatabase("notify", module, item.id, admin.email ?? admin.name);
         } else if (module === "winners" && action === "create") {
           await notifyWinnerAdded(store, item);
           audit(store, "notify", module, item.id, admin.email ?? admin.name);
+          await auditDatabase("notify", module, item.id, admin.email ?? admin.name);
         }
         await writeStore(store);
-        send(res, 200, item);
+        send(res, 200, savedItem);
         return;
       }
     }
@@ -647,10 +1042,19 @@ const server = createServer(async (req, res) => {
       }
       const deletedItem = store[module].find((entry) => entry.id === id);
       store[module] = store[module].filter((entry) => entry.id !== id);
+      if (useDatabase && module === "events") {
+        await queryDatabase("delete from events where id = $1", [id]);
+      } else if (useDatabase && module === "archive") {
+        await queryDatabase("delete from archive where id = $1", [id]);
+      } else if (useDatabase && module === "winners") {
+        await queryDatabase("delete from hall_of_fame where id = $1", [id]);
+      }
       audit(store, "delete", module, id, admin.email ?? admin.name);
+      await auditDatabase("delete", module, id, admin.email ?? admin.name);
       if (module === "events" && deletedItem) {
         await notifyEventCancelled(store, deletedItem);
         audit(store, "notify", module, id, admin.email ?? admin.name);
+        await auditDatabase("notify", module, id, admin.email ?? admin.name);
       }
       await writeStore(store);
       send(res, 200, { ok: true });
