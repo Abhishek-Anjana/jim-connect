@@ -47,6 +47,7 @@ const pool = useDatabase
       ssl: databaseUrl.includes("supabase.co") ? { rejectUnauthorized: false } : undefined
     })
   : null;
+let databaseOffline = false;
 const defaultAdmin = {
   active: true,
   email: "rekha.attri@jaipuria.ac.in",
@@ -163,8 +164,18 @@ function rowToNotice(row) {
 }
 
 async function queryDatabase(sql, params = []) {
-  if (!pool) throw new Error("DATABASE_URL is not configured");
-  return pool.query(sql, params);
+  if (!pool || databaseOffline) throw new Error("DATABASE_URL is not available");
+  try {
+    return await pool.query(sql, params);
+  } catch (error) {
+    databaseOffline = true;
+    console.error("PostgreSQL connection unavailable, falling back to Railway store", error);
+    throw error;
+  }
+}
+
+function hasDatabase() {
+  return useDatabase && !databaseOffline;
 }
 
 async function getDatabaseContent() {
@@ -184,12 +195,16 @@ async function getDatabaseContent() {
 }
 
 async function hydrateStoreFromDatabase(store) {
-  if (!useDatabase) return store;
-  const content = await getDatabaseContent();
-  store.archive = content.archive;
-  store.events = content.events;
-  store.notices = content.notices;
-  store.winners = content.winners;
+  if (!hasDatabase()) return store;
+  try {
+    const content = await getDatabaseContent();
+    store.archive = content.archive;
+    store.events = content.events;
+    store.notices = content.notices;
+    store.winners = content.winners;
+  } catch {
+    return store;
+  }
   return store;
 }
 
@@ -304,13 +319,13 @@ async function upsertDatabaseWinner(item) {
 }
 
 async function getDatabasePushTokens() {
-  if (!useDatabase) return [];
+  if (!hasDatabase()) return [];
   const result = await queryDatabase("select platform, token, updated_at from push_tokens where token is not null order by updated_at desc");
   return result.rows.map((row) => ({ platform: row.platform, token: row.token, updatedAt: toIso(row.updated_at) }));
 }
 
 async function auditDatabase(action, module, id, user = "admin") {
-  if (!useDatabase) return;
+  if (!hasDatabase()) return;
   await queryDatabase(
     `insert into audit_log (id, action, id_ref, module, "user")
      values ($1, $2, $3, $4, $5)`,
@@ -508,7 +523,7 @@ function sanitizeStoreForAdmin(store, admin) {
 
 async function sendEventPushNotification(store, payload) {
   store.pushTokens ??= [];
-  const tokenEntries = useDatabase ? await getDatabasePushTokens() : store.pushTokens;
+  const tokenEntries = hasDatabase() ? await getDatabasePushTokens() : store.pushTokens;
   const tokens = tokenEntries
     .map((entry) => entry.token)
     .filter((token) => typeof token === "string" && token.trim().length > 0);
@@ -563,7 +578,7 @@ async function sendEventPushNotification(store, payload) {
   store.notifications.unshift(notificationRecord);
   store.notifications = store.notifications.slice(0, 100);
   store.lastNotification = notificationRecord;
-  if (useDatabase) {
+  if (hasDatabase()) {
     await queryDatabase(
       `insert into notifications (id, payload, sent_at, status, token_count, error)
        values ($1, $2::jsonb, $3, $4, $5, $6)
@@ -700,7 +715,7 @@ const server = createServer(async (req, res) => {
     await hydrateStoreFromDatabase(store);
     req.store = store;
 
-    if (useDatabase && req.method === "GET" && path === "/notices") {
+    if (hasDatabase() && req.method === "GET" && path === "/notices") {
       const result = await queryDatabase(
         "select id, title, message, from_office, priority, created_at, is_active from notices where is_active = true order by created_at desc"
       );
@@ -708,7 +723,7 @@ const server = createServer(async (req, res) => {
       return;
     }
 
-    if (useDatabase && path === "/admin/notices" && req.method === "POST") {
+    if (hasDatabase() && path === "/admin/notices" && req.method === "POST") {
       const admin = requireAdmin(req, res);
       if (!admin) return;
       if (!canWrite(admin, "notices")) {
@@ -745,7 +760,7 @@ const server = createServer(async (req, res) => {
     }
 
     const databaseNoticeIdMatch = path.match(/^\/admin\/notices\/([^/]+)$/);
-    if (useDatabase && databaseNoticeIdMatch && (req.method === "DELETE" || req.method === "PATCH")) {
+    if (hasDatabase() && databaseNoticeIdMatch && (req.method === "DELETE" || req.method === "PATCH")) {
       const admin = requireAdmin(req, res);
       if (!admin) return;
       if (!canWrite(admin, "notices")) {
@@ -829,7 +844,7 @@ const server = createServer(async (req, res) => {
       const index = store.pushTokens.findIndex((entry) => entry.token === next.token);
       if (index >= 0) store.pushTokens[index] = next;
       else store.pushTokens.push(next);
-      if (useDatabase) {
+      if (hasDatabase()) {
         await queryDatabase(
           `insert into push_tokens (platform, token, updated_at)
            values ($1, $2, now())
@@ -847,7 +862,7 @@ const server = createServer(async (req, res) => {
     if (req.method === "GET" && path === "/admin/debug/tokens") {
       const admin = requireAdmin(req, res);
       if (!admin) return;
-      send(res, 200, useDatabase ? await getDatabasePushTokens() : store.pushTokens);
+      send(res, 200, hasDatabase() ? await getDatabasePushTokens() : store.pushTokens);
       return;
     }
 
@@ -862,7 +877,7 @@ const server = createServer(async (req, res) => {
       const id = adminEventMatch[1];
       const deletedItem = store.events.find((event) => event.id === id);
       store.events = store.events.filter((event) => event.id !== id);
-      if (useDatabase) {
+      if (hasDatabase()) {
         await queryDatabase("delete from events where id = $1", [id]);
       }
       audit(store, "delete", "events", id, admin.email ?? admin.name);
@@ -898,7 +913,7 @@ const server = createServer(async (req, res) => {
       const wasPublished = Boolean(existing?.published);
       const action = upsert(store.events, item);
       audit(store, action, "events", item.id, admin.email ?? admin.name);
-      const savedItem = useDatabase ? await upsertDatabaseEvent(item) : item;
+      const savedItem = hasDatabase() ? await upsertDatabaseEvent(item) : item;
       await auditDatabase(action, "events", item.id, admin.email ?? admin.name);
       if (item.published && !wasPublished) {
         await notifyEventPublished(store, item);
@@ -933,9 +948,9 @@ const server = createServer(async (req, res) => {
       const action = upsert(store[module], item);
       audit(store, action, module, item.id, admin.email ?? admin.name);
       const savedItem =
-        useDatabase && module === "archive"
+        hasDatabase() && module === "archive"
           ? await upsertDatabaseArchive(item)
-          : useDatabase && module === "winners"
+          : hasDatabase() && module === "winners"
             ? await upsertDatabaseWinner(item)
             : item;
       await auditDatabase(action, module, item.id, admin.email ?? admin.name);
@@ -1006,11 +1021,11 @@ const server = createServer(async (req, res) => {
         const action = upsert(store[storeKey], item);
         audit(store, action, module, item.id, admin.email ?? admin.name);
         const savedItem =
-          useDatabase && module === "events"
+          hasDatabase() && module === "events"
             ? await upsertDatabaseEvent(item)
-            : useDatabase && module === "archive"
+            : hasDatabase() && module === "archive"
               ? await upsertDatabaseArchive(item)
-              : useDatabase && module === "winners"
+              : hasDatabase() && module === "winners"
                 ? await upsertDatabaseWinner(item)
                 : item;
         await auditDatabase(action, module, item.id, admin.email ?? admin.name);
@@ -1044,11 +1059,11 @@ const server = createServer(async (req, res) => {
       }
       const deletedItem = store[module].find((entry) => entry.id === id);
       store[module] = store[module].filter((entry) => entry.id !== id);
-      if (useDatabase && module === "events") {
+      if (hasDatabase() && module === "events") {
         await queryDatabase("delete from events where id = $1", [id]);
-      } else if (useDatabase && module === "archive") {
+      } else if (hasDatabase() && module === "archive") {
         await queryDatabase("delete from archive where id = $1", [id]);
-      } else if (useDatabase && module === "winners") {
+      } else if (hasDatabase() && module === "winners") {
         await queryDatabase("delete from hall_of_fame where id = $1", [id]);
       }
       audit(store, "delete", module, id, admin.email ?? admin.name);
