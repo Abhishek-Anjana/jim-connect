@@ -1,4 +1,5 @@
 import { createServer } from "node:http";
+import dns from "node:dns";
 import { readFile, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { dirname, extname, join, resolve } from "node:path";
@@ -12,6 +13,7 @@ const { startEventReminderJob } = eventReminderJob;
 const { handleNoticeRoute } = noticesRoutes;
 const { Pool } = pg;
 const expo = new Expo();
+dns.setDefaultResultOrder("ipv4first");
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const storePath = process.env.STORE_PATH ? resolve(process.env.STORE_PATH) : join(root, "server", "data", "store.json");
