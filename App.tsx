@@ -121,6 +121,13 @@ export default function App() {
     });
   }, []);
 
+  useEffect(() => {
+    fetch("https://jim-connect-production.up.railway.app/events/upcoming")
+      .then((response) => response.json())
+      .then((data) => console.log("TEST FETCH SUCCESS - events count:", data.length))
+      .catch((err) => console.log("TEST FETCH FAILED:", err.message));
+  }, []);
+
   const visibleEvents = useMemo(() => {
     if (eventFilterGroup === "All") return sortUpcomingEvents(events);
 

@@ -69,13 +69,33 @@ export function useJimConnectContent() {
     setError(null);
 
     try {
-      const [nextEvents, nextArchive, nextFame, nextNotices] = await Promise.all([
+      const [eventsResult, archiveResult, fameResult, noticesResult] = await Promise.allSettled([
         getUpcomingEvents(),
         getArchiveEntries(),
         getWinners(),
         getNotices()
       ]);
-      assertContentRelations(nextEvents, nextArchive, nextFame);
+
+      const nextEvents = eventsResult.status === "fulfilled" ? eventsResult.value : events;
+      const nextArchive = archiveResult.status === "fulfilled" ? archiveResult.value : archive;
+      const nextFame = fameResult.status === "fulfilled" ? fameResult.value : fame;
+      const nextNotices = noticesResult.status === "fulfilled" ? noticesResult.value : noticeItems;
+
+      if (eventsResult.status === "rejected") console.log("Events fetch failed:", eventsResult.reason);
+      if (archiveResult.status === "rejected") console.log("Archive fetch failed:", archiveResult.reason);
+      if (fameResult.status === "rejected") console.log("Hall of Fame fetch failed:", fameResult.reason);
+      if (noticesResult.status === "rejected") console.log("Notices fetch failed:", noticesResult.reason);
+
+      if (eventsResult.status === "rejected" && archiveResult.status === "rejected" && fameResult.status === "rejected" && noticesResult.status === "rejected") {
+        throw new Error("All content requests failed");
+      }
+
+      try {
+        assertContentRelations(nextEvents, nextArchive, nextFame);
+      } catch (relationError) {
+        console.log("Content relation warning:", relationError);
+      }
+
       setEvents(nextEvents);
       setArchive(nextArchive);
       setFame(nextFame);
