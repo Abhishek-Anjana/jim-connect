@@ -7,7 +7,6 @@ import {
   Text,
   View
 } from "react-native";
-import { config } from "../../src/config/env";
 
 const priorityStyles = {
   Normal: {
@@ -36,10 +35,12 @@ function formatRelativeTime(value) {
 }
 
 async function fetchNotices() {
-  if (!config.apiBaseUrl) return [];
-  const response = await fetch(`${config.apiBaseUrl}/notices`);
+  console.log("Fetching from:", "https://jim-connect-production.up.railway.app/notices");
+  const response = await fetch("https://jim-connect-production.up.railway.app/notices");
   if (!response.ok) throw new Error(`Notice request failed: ${response.status}`);
-  return response.json();
+  const data = await response.json();
+  console.log("Response received:", JSON.stringify(data));
+  return data;
 }
 
 export default function NoticesScreen({ initialNotices = [] }) {

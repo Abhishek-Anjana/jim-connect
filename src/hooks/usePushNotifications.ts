@@ -3,7 +3,6 @@ import { Platform } from "react-native";
 import Constants from "expo-constants";
 import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
-import { config } from "../config/env";
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -52,7 +51,7 @@ async function registerForPushNotificationsAsync() {
   const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
   console.log("Push token:", token);
 
-  await fetch(`${config.apiBaseUrl || "https://jim-connect-production.up.railway.app"}/push/register`, {
+  await fetch("https://jim-connect-production.up.railway.app/push/register", {
     body: JSON.stringify({ platform: Platform.OS, token }),
     headers: { "Content-Type": "application/json" },
     method: "POST"
