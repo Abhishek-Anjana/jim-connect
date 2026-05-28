@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -113,6 +114,12 @@ export default function App() {
   const [pendingNotification, setPendingNotification] = useState<NotificationTarget | null>(null);
   const hasUrgentNotice = notices.some((notice) => notice.priority === "Urgent");
   usePushNotifications(setPendingNotification);
+
+  useEffect(() => {
+    void AsyncStorage.clear().then(() => {
+      console.log("Cache cleared on startup");
+    });
+  }, []);
 
   const visibleEvents = useMemo(() => {
     if (eventFilterGroup === "All") return sortUpcomingEvents(events);
