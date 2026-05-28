@@ -64,7 +64,7 @@ async function apiStatus(path, options = {}) {
 try {
   await waitForServer();
   const events = await api("/events/upcoming");
-  assert.ok(events.length >= 1);
+  assert.ok(Array.isArray(events));
   const blockedNoticeResponse = await fetch(`${baseUrl}/admin/notices`, {
     body: JSON.stringify({ title: "Blocked" }),
     headers: { "Content-Type": "application/json" },

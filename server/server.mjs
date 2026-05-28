@@ -43,8 +43,11 @@ const databaseUrl = process.env.DATABASE_URL;
 const useDatabase = Boolean(databaseUrl && !process.env.STORE_PATH);
 const pool = useDatabase
   ? new Pool({
+      connectionTimeoutMillis: 10000,
       connectionString: databaseUrl,
-      ssl: databaseUrl.includes("supabase.co") ? { rejectUnauthorized: false } : undefined
+      idleTimeoutMillis: 30000,
+      max: 10,
+      ssl: { rejectUnauthorized: false }
     })
   : null;
 let databaseOffline = false;
