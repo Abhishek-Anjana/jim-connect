@@ -355,6 +355,7 @@ function EventsScreen({
     <View>
       <CampusHero />
       <SectionHeading title="Upcoming Events" subtitle="Nearest campus opportunities first" lastUpdated={lastUpdated} />
+      <Text style={{ fontSize: 10, color: "red" }}>API: https://jim-connect-production.up.railway.app</Text>
       <EventTypeFilter
         group={filterGroup}
         setGroup={setFilterGroup}
