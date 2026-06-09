@@ -94,6 +94,19 @@ function showSuccessToast(item = "Item") {
   }, 3000);
 }
 
+function showToast(message) {
+  toast.textContent = message;
+  toast.hidden = false;
+  toast.classList.add("show");
+  window.clearTimeout(showToast.timer);
+  showToast.timer = window.setTimeout(() => {
+    toast.classList.remove("show");
+    window.setTimeout(() => {
+      toast.hidden = true;
+    }, 350);
+  }, 3000);
+}
+
 function canWrite(module) {
   const role = store?.currentAdmin?.role;
   if (role === "Super Admin") return true;
@@ -344,6 +357,7 @@ function bindNoticePreview() {
 }
 
 function renderNotices() {
+  const activeNotices = (store.notices ?? []).filter((notice) => notice.is_active !== false);
   content.innerHTML = `
     <div class="grid">
       ${canWrite("notices") ? `
@@ -358,18 +372,41 @@ function renderNotices() {
         </form>
       ` : `<section class="panel"><h2>Read-only access</h2><p class="meta">Your role can view notices but cannot publish them.</p></section>`}
       <section class="list">
-        ${(store.notices ?? []).map((notice) => `
+        ${activeNotices.map((notice) => {
+          console.log("Notice object:", notice);
+          return `
           <article class="card notice-card notice-${String(notice.priority ?? "Normal").toLowerCase()}">
             <h3>${escapeHtml(notice.title)}</h3>
             <p class="meta">${escapeHtml(notice.from_office)} | ${escapeHtml(notice.priority)} | ${escapeHtml(notice.created_at)}</p>
             <p>${escapeHtml(notice.message)}</p>
             <div class="row">${canWrite("notices") ? `<button class="danger" data-delete-notice="${notice.id}">Delete</button>` : ""}</div>
           </article>
-        `).join("") || `<article class="card"><h3>No notices yet</h3><p class="meta">Dean's notices will appear here after publishing.</p></article>`}
+        `;
+        }).join("") || `<article class="card"><h3>No notices yet</h3><p class="meta">Dean's notices will appear here after publishing.</p></article>`}
       </section>
     </div>
   `;
   bindNoticePreview();
+}
+
+async function deleteNotice(id) {
+  console.log("Deleting notice ID:", id);
+  console.log("Using token:", token.value);
+  const response = await fetch(`${API_BASE_URL}/admin/notices/${encodeURIComponent(id)}`, {
+    headers: {
+      "Content-Type": "application/json",
+      "X-Admin-Token": token.value
+    },
+    method: "DELETE"
+  });
+  const text = await response.text();
+  const data = text ? JSON.parse(text) : null;
+  if (!response.ok) {
+    throw new Error(data?.error ?? data?.errors?.join("; ") ?? text ?? "Notice delete failed");
+  }
+  console.log("Deleted:", data);
+  await load();
+  showToast("Notice deleted successfully");
 }
 
 function renderAudit() {
@@ -451,10 +488,11 @@ content.addEventListener("click", async (event) => {
   }
   if (deleteNoticeId) {
     try {
-      await request(`/admin/notices/${deleteNoticeId}`, { method: "DELETE" });
-      await load();
+      await deleteNotice(deleteNoticeId);
     } catch (error) {
+      console.error("Delete failed:", error);
       setStatus(error.message);
+      alert(`Delete failed: ${error.message}`);
     }
   }
 });

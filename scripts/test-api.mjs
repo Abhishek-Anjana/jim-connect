@@ -12,6 +12,12 @@ const baseUrl = `http://localhost:${port}`;
 const token = "test-admin-token";
 await copyFile(resolve(root, "server/data/store.json"), storePath);
 
+const futureStart = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+futureStart.setHours(10, 0, 0, 0);
+const futureEnd = new Date(futureStart.getTime() + 2 * 60 * 60 * 1000);
+const laterStart = new Date(futureStart.getTime() + 24 * 60 * 60 * 1000);
+const laterEnd = new Date(laterStart.getTime() + 2 * 60 * 60 * 1000);
+
 const child = spawn(process.execPath, ["server/server.mjs"], {
   cwd: root,
   env: {
@@ -104,7 +110,7 @@ try {
       attachments: [],
       club: "Student Affairs",
       description: "Published by the automated API smoke test.",
-      endsAt: "2026-06-01T12:00:00+05:30",
+      endsAt: futureEnd.toISOString(),
       id: "api-smoke-event",
       image_data: "dGVzdA==",
       name: "API Smoke Event",
@@ -112,7 +118,7 @@ try {
       registration_link: "https://forms.gle/example",
       reminder_sent: false,
       speakers: [],
-      startsAt: "2026-06-01T10:00:00+05:30",
+      startsAt: futureStart.toISOString(),
       venue: "Test Hall"
     }),
     method: "POST"
@@ -169,13 +175,13 @@ try {
         attachments: [],
         club: "Student Affairs",
         description: "Viewer should not be able to publish.",
-        endsAt: "2026-06-02T12:00:00+05:30",
+        endsAt: laterEnd.toISOString(),
         id: "viewer-blocked-event",
         image: "https://example.com/event.jpg",
         name: "Viewer Blocked Event",
         published: true,
         speakers: [],
-        startsAt: "2026-06-02T10:00:00+05:30",
+        startsAt: laterStart.toISOString(),
         venue: "Test Hall"
       }),
       headers: { "X-Admin-Token": "jim-viewer-dev" },
@@ -212,13 +218,13 @@ try {
       attachments: [],
       club: "Student Affairs",
       description: "Content managers can publish approved events.",
-      endsAt: "2026-06-03T12:00:00+05:30",
+      endsAt: laterEnd.toISOString(),
       id: "content-manager-event",
       image: "https://example.com/event.jpg",
       name: "Content Manager Event",
       published: true,
       speakers: [],
-      startsAt: "2026-06-03T10:00:00+05:30",
+      startsAt: laterStart.toISOString(),
       venue: "Test Hall"
     }),
     headers: { "X-Admin-Token": "jim-content-dev" },

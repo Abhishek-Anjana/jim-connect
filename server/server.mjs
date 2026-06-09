@@ -792,7 +792,7 @@ const server = createServer(async (req, res) => {
       audit(store, action, "notices", id, admin.email ?? admin.name);
       await auditDatabase(action, "notices", id, admin.email ?? admin.name);
       await writeStore(store);
-      send(res, 200, req.method === "DELETE" ? { ok: true } : notice);
+      send(res, 200, req.method === "DELETE" ? { message: "Notice deleted", ok: true, success: true } : notice);
       return;
     }
 

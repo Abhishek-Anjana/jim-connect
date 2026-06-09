@@ -106,7 +106,7 @@ async function handleNoticeRoute({
       notice.is_active = false;
       audit(store, "notice_deleted", "notices", id, admin.email ?? admin.name);
       await writeStore(store);
-      send(res, 200, { message: "Notice deleted", ok: true });
+      send(res, 200, { message: "Notice deleted", ok: true, success: true });
       return true;
     }
 
