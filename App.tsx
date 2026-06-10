@@ -584,7 +584,7 @@ function archiveImageUri(entry: ArchiveEntry) {
 }
 
 function winnerImageUri(winner: Winner) {
-  return winner.image_data ? `data:image/jpeg;base64,${winner.image_data}` : winner.portrait;
+  return winner.image_data ? `data:image/jpeg;base64,${winner.image_data}` : winner.portrait ?? "";
 }
 
 function DetailScreen({ detail }: { detail: Detail }) {
@@ -758,11 +758,13 @@ function WinnerCard({
       <Text style={styles.winnerName}>{winner.name}</Text>
       <Text style={styles.winnerMeta}>{winner.batch}</Text>
       <Text style={styles.awardBadge}>{winner.award}</Text>
-      <Text style={styles.winnerEvent}>{winner.eventName}</Text>
-      <Pressable onPress={onPress} style={styles.linkButton} accessibilityRole="button" accessibilityLabel={`Open archive for ${winner.eventName}`}>
-        <Text style={styles.linkButtonText}>View archive</Text>
-        <Ionicons name="chevron-forward" size={16} color={palette.teal} />
-      </Pressable>
+      {winner.eventName ? <Text style={styles.winnerEvent}>{winner.eventName}</Text> : null}
+      {winner.archiveId && winner.eventName ? (
+        <Pressable onPress={onPress} style={styles.linkButton} accessibilityRole="button" accessibilityLabel={`Open archive for ${winner.eventName}`}>
+          <Text style={styles.linkButtonText}>View archive</Text>
+          <Ionicons name="chevron-forward" size={16} color={palette.teal} />
+        </Pressable>
+      ) : null}
     </View>
   );
 }

@@ -21,6 +21,10 @@ function hasOptionalHttpsUrl(value: Record<string, unknown>, key: string) {
   return value[key] === undefined || (typeof value[key] === "string" && isHttpsUrl(value[key]));
 }
 
+function hasOptionalString(value: Record<string, unknown>, key: string) {
+  return value[key] === undefined || typeof value[key] === "string";
+}
+
 function hasUniqueIds(items: Array<{ id: string }>, label: string) {
   const ids = new Set(items.map((item) => item.id));
   if (ids.size !== items.length) {
@@ -109,12 +113,12 @@ export function isValidWinner(value: unknown): value is Winner {
     hasString(value, "name") &&
     hasString(value, "batch") &&
     hasString(value, "award") &&
-    hasString(value, "category") &&
     hasString(value, "club") &&
-    hasString(value, "eventName") &&
-    hasString(value, "archiveId") &&
-    ((typeof value.portrait === "string" && isHttpsUrl(value.portrait)) ||
-      (typeof value.image_data === "string" && value.image_data.trim().length > 0)) &&
+    hasOptionalString(value, "category") &&
+    hasOptionalString(value, "eventName") &&
+    hasOptionalString(value, "archiveId") &&
+    (value.portrait === undefined || value.portrait === "" || (typeof value.portrait === "string" && isHttpsUrl(value.portrait))) &&
+    (value.image_data === undefined || typeof value.image_data === "string") &&
     typeof value.champion === "boolean"
   );
 }
@@ -134,6 +138,7 @@ export function assertContentRelations(events: Event[], archive: ArchiveEntry[],
 
   const archiveById = new Map(archive.map((entry) => [entry.id, entry]));
   for (const winner of winners) {
+    if (!winner.archiveId || !winner.eventName) continue;
     const linkedArchive = archiveById.get(winner.archiveId);
     if (!linkedArchive) {
       throw new Error(`${winner.name} links to missing archive ${winner.archiveId}`);

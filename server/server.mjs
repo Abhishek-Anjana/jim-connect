@@ -140,13 +140,13 @@ function rowToArchive(row) {
 
 function rowToWinner(row) {
   return {
-    archiveId: row.archive_id,
+    archiveId: row.archive_id ?? "",
     award: row.award,
     batch: row.batch,
-    category: row.category,
+    category: row.category ?? row.award,
     champion: Boolean(row.champion),
     club: row.club,
-    eventName: row.event_name,
+    eventName: row.event_name ?? "",
     id: row.id,
     image_data: row.image_data ?? "",
     name: row.name,
@@ -309,10 +309,10 @@ async function upsertDatabaseWinner(item) {
       item.name,
       item.batch,
       item.award,
-      item.category,
+      item.category || item.award,
       item.club,
-      item.eventName,
-      item.archiveId,
+      item.eventName ?? "",
+      item.archiveId || null,
       item.portrait ?? "",
       item.image_data ?? "",
       Boolean(item.champion)
@@ -374,18 +374,20 @@ function normalizeArchiveForStore(item, existing = {}) {
   };
 }
 
-function normalizeWinnerForStore(item, existing = {}, store = {}) {
-  const eventName = String(item.eventName ?? existing.eventName ?? "").trim();
-  const linkedArchive = eventName ? (store.archive ?? []).find((entry) => entry.name.toLowerCase() === eventName.toLowerCase()) : null;
-  const category = String(item.category ?? "").trim() || existing.category || item.award || "";
+function normalizeWinnerForStore(item, existing = {}) {
+  const award = String(item.award ?? item.award_category ?? existing.award ?? "").trim();
+  const category = String(item.category ?? existing.category ?? award).trim() || award;
+  const eventName = String(item.eventName ?? item.event_name ?? existing.eventName ?? "").trim();
   return {
     ...existing,
     ...item,
-    archiveId: item.archiveId || existing.archiveId || linkedArchive?.id || "",
+    archiveId: item.archiveId ?? item.archive_id ?? existing.archiveId ?? "",
+    award,
     category,
-    eventName: eventName || linkedArchive?.name || existing.eventName || "",
+    eventName,
     portrait: item.portrait ?? existing.portrait ?? "",
-    image_data: item.image_data ?? existing.image_data ?? ""
+    image_data: item.image_data ?? existing.image_data ?? "",
+    champion: Boolean(item.champion ?? existing.champion ?? false)
   };
 }
 
@@ -489,19 +491,12 @@ function validateAdminItem(module, item, store) {
   }
 
   if (module === "winners") {
-    item = normalizeWinnerForStore(item, store.winners?.find((entry) => entry.id === item.id), store);
-    for (const field of ["name", "batch", "award", "club", "eventName", "archiveId"]) {
+    item = normalizeWinnerForStore(item, store.winners?.find((entry) => entry.id === item.id));
+    for (const field of ["name", "batch", "award", "club"]) {
       requireString(item, field, errors);
     }
-    if (!item.image_data && !item.portrait) errors.push("portrait photo is required");
     if (item.portrait && !isHttpsUrl(item.portrait)) errors.push("portrait must be an HTTPS URL");
     if (typeof item.champion !== "boolean") errors.push("champion must be true or false");
-    const archive = store.archive.find((entry) => entry.id === item.archiveId);
-    if (!archive) {
-      errors.push("archiveId must reference an existing archive entry");
-    } else if (archive.name !== item.eventName) {
-      errors.push("eventName must match the linked archive entry name");
-    }
   }
 
   if (module === "admins") {

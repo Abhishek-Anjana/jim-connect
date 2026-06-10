@@ -42,6 +42,12 @@ try {
     alter table events add column if not exists reminder_sent boolean default false;
     alter table archive add column if not exists image_data text;
     alter table hall_of_fame add column if not exists image_data text;
+    alter table hall_of_fame alter column archive_id drop not null;
+    alter table hall_of_fame alter column event_name set default '';
+    alter table hall_of_fame alter column portrait set default '';
+    alter table hall_of_fame alter column portrait drop not null;
+    alter table hall_of_fame alter column category set default 'Hall of Fame';
+    alter table hall_of_fame drop constraint if exists hall_of_fame_archive_id_fkey;
 
     create table if not exists notices (
       id serial primary key,

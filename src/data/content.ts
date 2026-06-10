@@ -33,11 +33,11 @@ export type Winner = {
   name: string;
   batch: string;
   award: string;
-  category: string;
+  category?: string;
   club: Exclude<Club, "All">;
-  eventName: string;
-  archiveId: string;
-  portrait: string;
+  eventName?: string;
+  archiveId?: string;
+  portrait?: string;
   image_data?: string;
   champion: boolean;
 };

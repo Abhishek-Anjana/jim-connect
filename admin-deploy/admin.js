@@ -2,7 +2,7 @@ const modules = {
   admins: ["id", "name", "email", "role", "active", "token"],
   archive: ["id", "eventId", "name", "date", "club", "year", "image_data", "summary", "driveUrl"],
   events: ["id", "name", "startsAt", "endsAt", "venue", "club", "registration_link", "image_data", "description", "speakers", "attachments", "published"],
-  winners: ["id", "name", "batch", "award", "category", "club", "eventName", "archiveId", "image_data", "champion"]
+  winners: ["name", "batch", "award", "club", "image_data", "eventName"]
 };
 
 const clubGroups = {
@@ -197,7 +197,7 @@ function emptyFor(module) {
   for (const field of modules[module]) item[field] = "";
   if (module === "events") Object.assign(item, { id: `event-${Date.now()}`, published: false, speakers: [], attachments: [] });
   if (module === "archive") item.id = `archive-${Date.now()}`;
-  if (module === "winners") Object.assign(item, { id: `winner-${Date.now()}`, batch: "2025-27", award: "Champion of the Year", champion: false });
+  if (module === "winners") Object.assign(item, { id: `winner-${Date.now()}`, batch: "2025-27", award: "Champion of the Year" });
   if (module === "admins") Object.assign(item, { id: `admin-${Date.now()}`, active: true, role: "Content Manager" });
   return item;
 }
@@ -226,7 +226,7 @@ function fieldHtml(module, field, item) {
     return `<label>Award Category<select name="${field}">${selectOptions(awardOptions, value)}</select></label>`;
   }
   if (module === "winners" && field === "eventName") {
-    return `<label>Linked Archive Event<input name="${field}" value="${escapeHtml(value)}" /></label>`;
+    return `<label>Event Name<input name="${field}" placeholder="Optional" value="${escapeHtml(value)}" /></label>`;
   }
   if (["description", "summary", "speakers", "attachments"].includes(field)) {
     return `<label>${field}<textarea name="${field}">${escapeHtml(value)}</textarea></label>`;
@@ -244,6 +244,7 @@ function renderForm(module, item = emptyFor(module)) {
   return `
     <form class="panel form-grid" id="edit-form">
       <h2>${item.id ? "Edit" : "Create"} ${module}</h2>
+      ${module === "winners" && item.id ? `<input name="id" type="hidden" value="${escapeHtml(item.id)}" />` : ""}
       ${modules[module].map((field) => fieldHtml(module, field, item)).join("")}
       ${module === "events" ? `<p class="meta date-preview" id="event-date-preview">${readableDateTime(item.startsAt)} to ${readableDateTime(item.endsAt)}</p>` : ""}
       ${module === "archive" ? `<p class="meta date-preview" id="archive-date-preview">${readableDate(item.date)}</p>` : ""}
@@ -527,8 +528,14 @@ content.addEventListener("submit", async (event) => {
       item[field] = parseField(field, form.get(field) ?? "");
     }
   }
+  if (active === "winners") {
+    item.id = form.get("id")?.trim() || item.id || `winner-${Date.now()}`;
+    item.category = item.award;
+    item.archiveId = "";
+    item.champion = false;
+  }
   try {
-    await request(`/admin/api/${active}`, { body: JSON.stringify(item), method: "POST" });
+    await request(active === "winners" ? "/admin/hall-of-fame" : `/admin/api/${active}`, { body: JSON.stringify(item), method: "POST" });
     if (["events", "archive", "winners"].includes(active)) {
       showSuccessToast(active === "winners" ? "Hall of Fame profile" : active.slice(0, 1).toUpperCase() + active.slice(1));
     }
