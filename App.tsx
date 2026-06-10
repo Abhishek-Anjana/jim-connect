@@ -97,7 +97,7 @@ function canonicalEventClub(value: string) {
 }
 
 export default function App() {
-  const { archive, error, events, fame, lastUpdated, loading, notices, refresh, refreshing } = useJimConnectContent();
+  const { archive, error, events, fame, lastUpdated, loading, notices, refresh, refreshFame, refreshing } = useJimConnectContent();
   const [tab, setTab] = useState<Tab>("events");
   const [club, setClub] = useState<Club>("All");
   const [eventFilterGroup, setEventFilterGroup] = useState<EventFilterGroup>("All");
@@ -127,6 +127,12 @@ export default function App() {
       .then((data) => console.log("TEST FETCH SUCCESS - events count:", data.length))
       .catch((err) => console.log("TEST FETCH FAILED:", err.message));
   }, []);
+
+  useEffect(() => {
+    if (tab === "fame") {
+      void refreshFame();
+    }
+  }, [refreshFame, tab]);
 
   const visibleEvents = useMemo(() => {
     if (eventFilterGroup === "All") return sortUpcomingEvents(events);

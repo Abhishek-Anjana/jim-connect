@@ -135,6 +135,37 @@ export function useJimConnectContent() {
     }
   }, []);
 
+  const refreshFame = useCallback(async () => {
+    try {
+      const nextFame = await getWinners();
+      setFame(nextFame);
+      const savedAt = new Date().toISOString();
+      setLastUpdated(savedAt);
+      await AsyncStorage.setItem("hallOfFame", JSON.stringify(nextFame));
+
+      try {
+        const cached = await AsyncStorage.getItem(CACHE_KEY);
+        if (cached) {
+          const parsed = parseCachedContentForTest(cached);
+          await AsyncStorage.setItem(
+            CACHE_KEY,
+            JSON.stringify({
+              ...parsed,
+              fame: nextFame,
+              savedAt
+            } satisfies CachedContent)
+          );
+        }
+      } catch (cacheError) {
+        console.log("Hall of Fame shared cache update skipped:", cacheError);
+      }
+    } catch (err) {
+      console.log("Hall of Fame live refresh failed:", err);
+      const cached = await AsyncStorage.getItem("hallOfFame");
+      if (cached) setFame(validateArray(JSON.parse(cached), isValidWinner, "cached hall of fame"));
+    }
+  }, []);
+
   useEffect(() => {
     void load();
   }, [load]);
@@ -158,6 +189,7 @@ export function useJimConnectContent() {
     loading,
     notices: noticeItems,
     refresh: () => load(true),
+    refreshFame,
     refreshing
   };
 }
