@@ -1,5 +1,4 @@
 import { Ionicons } from "@expo/vector-icons";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -115,18 +114,6 @@ export default function App() {
   const hasUrgentNotice = notices.some((notice) => notice.priority === "Urgent");
   usePushNotifications(setPendingNotification);
 
-  useEffect(() => {
-    void AsyncStorage.clear().then(() => {
-      console.log("Cache cleared on startup");
-    });
-  }, []);
-
-  useEffect(() => {
-    fetch("https://jim-connect-production.up.railway.app/events/upcoming")
-      .then((response) => response.json())
-      .then((data) => console.log("TEST FETCH SUCCESS - events count:", data.length))
-      .catch((err) => console.log("TEST FETCH FAILED:", err.message));
-  }, []);
 
   useEffect(() => {
     if (tab === "fame") {

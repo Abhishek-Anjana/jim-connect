@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { AppState } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { ArchiveEntry, Event, Notice, Winner } from "../data/content";
+import { ArchiveEntry, Event, Notice, Winner, archiveEntries, notices, upcomingEvents, winners } from "../data/content";
 import { getArchiveEntries, getNotices, getUpcomingEvents, getWinners } from "../services/jimConnectApi";
 import {
   assertContentRelations,
@@ -21,7 +21,6 @@ type CachedContent = {
 };
 
 const CACHE_KEY = "jim-connect-content-v1";
-const CACHE_MAX_AGE_MS = 60 * 1000;
 
 export function parseCachedContentForTest(value: string): CachedContent {
   const parsed = JSON.parse(value) as unknown;
@@ -117,8 +116,6 @@ export function useJimConnectContent() {
         const cached = await AsyncStorage.getItem(CACHE_KEY);
         if (!cached) throw new Error("No cached content");
         const parsed = parseCachedContentForTest(cached);
-        const age = Date.now() - new Date(parsed.savedAt).getTime();
-        if (age > CACHE_MAX_AGE_MS) throw new Error("Cached content expired");
         setEvents(parsed.events);
         setArchive(parsed.archive);
         setFame(parsed.fame);
@@ -126,8 +123,23 @@ export function useJimConnectContent() {
         setLastUpdated(parsed.savedAt);
         setError("Showing latest saved campus content");
       } catch {
-        await AsyncStorage.removeItem(CACHE_KEY);
-        setError("Could not load campus content");
+        const savedAt = new Date().toISOString();
+        setEvents(upcomingEvents);
+        setArchive(archiveEntries);
+        setFame(winners);
+        setNoticeItems(notices);
+        setLastUpdated(savedAt);
+        setError("Live server unavailable. Showing bundled campus content.");
+        await AsyncStorage.setItem(
+          CACHE_KEY,
+          JSON.stringify({
+            archive: archiveEntries,
+            events: upcomingEvents,
+            fame: winners,
+            notices,
+            savedAt
+          } satisfies CachedContent)
+        );
       }
     } finally {
       setLoading(false);
