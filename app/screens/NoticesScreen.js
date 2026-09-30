@@ -35,8 +35,8 @@ function formatRelativeTime(value) {
 }
 
 async function fetchNotices() {
-  console.log("Fetching from:", "https://jim-connect-production.up.railway.app/notices");
-  const response = await fetch("https://jim-connect-production.up.railway.app/notices");
+  console.log("Fetching from:", "https://jim-connect-api.onrender.com/notices");
+  const response = await fetch("https://jim-connect-api.onrender.com/notices");
   if (!response.ok) throw new Error(`Notice request failed: ${response.status}`);
   const data = await response.json();
   console.log("Response received:", JSON.stringify(data));

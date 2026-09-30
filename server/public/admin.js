@@ -48,7 +48,7 @@ const requiredFields = {
   winners: ["name", "batch", "award", "club"]
 };
 
-const API_BASE_URL = "https://jim-connect-production.up.railway.app";
+const API_BASE_URL = "https://jim-connect-api.onrender.com";
 const apiBaseUrl = API_BASE_URL;
 let active = "dashboard";
 let store = null;

@@ -1,4 +1,4 @@
-const defaultApiBaseUrl = "https://jim-connect-production.up.railway.app";
+const defaultApiBaseUrl = "https://jim-connect-api.onrender.com";
 const rawApiBaseUrl = (process.env.EXPO_PUBLIC_API_URL ?? process.env.EXPO_PUBLIC_API_BASE_URL ?? defaultApiBaseUrl).trim();
 const rawApiTimeoutMs = Number(process.env.EXPO_PUBLIC_API_TIMEOUT_MS ?? 8000);
 

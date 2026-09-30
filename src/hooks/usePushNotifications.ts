@@ -51,7 +51,7 @@ async function registerForPushNotificationsAsync() {
   const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
   console.log("Push token:", token);
 
-  await fetch("https://jim-connect-production.up.railway.app/push/register", {
+  await fetch("https://jim-connect-api.onrender.com/push/register", {
     body: JSON.stringify({ platform: Platform.OS, token }),
     headers: { "Content-Type": "application/json" },
     method: "POST"

@@ -1,6 +1,6 @@
 const appJson = require("./app.json");
 
-const productionApiUrl = "https://jim-connect-production.up.railway.app";
+const productionApiUrl = "https://jim-connect-api.onrender.com";
 
 process.env.EXPO_PUBLIC_API_URL = productionApiUrl;
 process.env.EXPO_PUBLIC_API_BASE_URL = productionApiUrl;

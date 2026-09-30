@@ -35,7 +35,7 @@
       "expo-font"
     ],
     "extra": {
-      "EXPO_PUBLIC_API_URL": "https://jim-connect-production.up.railway.app",
+      "EXPO_PUBLIC_API_URL": "https://jim-connect-api.onrender.com",
       "eas": {
         "projectId": "9a9138a2-1cf6-4829-aedf-a3edf653d6e6"
       }

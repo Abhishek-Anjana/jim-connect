@@ -17,8 +17,8 @@ async function parseResponse(response: Response, label: string) {
 }
 
 export async function getUpcomingEvents() {
-  console.log("Fetching from:", "https://jim-connect-production.up.railway.app/events/upcoming");
-  const response = await fetch("https://jim-connect-production.up.railway.app/events/upcoming", {
+  console.log("Fetching from:", "https://jim-connect-api.onrender.com/events/upcoming");
+  const response = await fetch("https://jim-connect-api.onrender.com/events/upcoming", {
     headers: noCacheHeaders
   });
   const data = await parseResponse(response, "Events");
@@ -26,8 +26,8 @@ export async function getUpcomingEvents() {
 }
 
 export async function getArchiveEntries() {
-  console.log("Fetching from:", "https://jim-connect-production.up.railway.app/archive");
-  const response = await fetch("https://jim-connect-production.up.railway.app/archive", {
+  console.log("Fetching from:", "https://jim-connect-api.onrender.com/archive");
+  const response = await fetch("https://jim-connect-api.onrender.com/archive", {
     headers: noCacheHeaders
   });
   const data = await parseResponse(response, "Archive");
@@ -35,8 +35,8 @@ export async function getArchiveEntries() {
 }
 
 export async function getWinners() {
-  console.log("Fetching from:", "https://jim-connect-production.up.railway.app/hall-of-fame");
-  const response = await fetch("https://jim-connect-production.up.railway.app/hall-of-fame", {
+  console.log("Fetching from:", "https://jim-connect-api.onrender.com/hall-of-fame");
+  const response = await fetch("https://jim-connect-api.onrender.com/hall-of-fame", {
     headers: noCacheHeaders
   });
   const data = await parseResponse(response, "Hall of Fame");
@@ -44,8 +44,8 @@ export async function getWinners() {
 }
 
 export async function getNotices() {
-  console.log("Fetching from:", "https://jim-connect-production.up.railway.app/notices");
-  const response = await fetch("https://jim-connect-production.up.railway.app/notices", {
+  console.log("Fetching from:", "https://jim-connect-api.onrender.com/notices");
+  const response = await fetch("https://jim-connect-api.onrender.com/notices", {
     headers: noCacheHeaders
   });
   const data = await parseResponse(response, "Notices");
