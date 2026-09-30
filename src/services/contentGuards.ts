@@ -18,7 +18,7 @@ function isHttpsUrl(value: string) {
 }
 
 function hasOptionalHttpsUrl(value: Record<string, unknown>, key: string) {
-  return value[key] === undefined || (typeof value[key] === "string" && isHttpsUrl(value[key]));
+  return value[key] === undefined || value[key] === "" || (typeof value[key] === "string" && isHttpsUrl(value[key]));
 }
 
 function hasOptionalString(value: Record<string, unknown>, key: string) {
