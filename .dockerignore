@@ -1,0 +1,10 @@
+node_modules
+.git
+.expo
+dist-web
+dist-android
+dist-ios
+admin-deploy
+ippb-bajaj-insurance-site
+*.log
+.env
